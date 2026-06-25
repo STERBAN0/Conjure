@@ -16,28 +16,32 @@ bus, so effects can clean up their internal state on enter/exit.
 from __future__ import annotations
 
 import logging
-from typing import Callable
 
 import cv2
 import numpy as np
 import pygame
 
-import config
 from core.hooks import HookBus
 from core.state import (
-    AbilityState,
-    FrameState,
-    GestureSignals,
     PHASE_ACTIVE,
     PHASE_CHARGING,
     PHASE_RELEASING,
+    AbilityState,
+    FrameState,
+    GestureSignals,
 )
 from effects.base import LAYER_BG, LAYER_FG, Effect
 from effects.chidori import ChidoriEffect
+from effects.fireball import FireballEffect
+from effects.frost_nova import FrostNovaEffect
 from effects.kamehameha import KamehamehaEffect
+from effects.laser_eyes import LaserEyesEffect, MeltCanvas
+from effects.projectiles import ProjectileField
 from effects.rasengan import RasenganEffect
 from effects.reality_tear import RealityTearEffect
 from effects.space_stretch import SpaceStretchEffect
+from effects.time_freeze import TimeFreezeEffect
+from effects.time_shatter import TimeShatter
 
 log = logging.getLogger(__name__)
 
@@ -48,6 +52,9 @@ class EffectsRenderer:
         self.height = height
         self.hooks = hooks
         self.effects: list[Effect] = []
+        # Persistent laser-eyes "drawing" surface, cleared by the 'R' key. Set in
+        # default_renderer(); None if the laser effect isn't registered.
+        self.melt_canvas: MeltCanvas | None = None
 
     def add(self, effect: Effect) -> None:
         self.effects.append(effect)
@@ -57,9 +64,6 @@ class EffectsRenderer:
 
     def _wire_lifecycle(self, effect: Effect) -> None:
         name = effect.ability_name
-
-        def filtered(handler: Callable, *args, **kwargs):
-            return handler(*args, **kwargs)
 
         self.hooks.on(
             "ability_enter",
@@ -141,6 +145,11 @@ class EffectsRenderer:
 
         self.hooks.emit("frame_rendered", frame, signals, ability)
 
+    def clear_drawings(self) -> None:
+        """Erase the persistent laser-eyes molten trail (wired to the 'R' key)."""
+        if self.melt_canvas is not None:
+            self.melt_canvas.clear()
+
     @staticmethod
     def _effect_active(effect: Effect, ability: AbilityState) -> bool:
         if not effect.is_gated():
@@ -151,17 +160,36 @@ class EffectsRenderer:
 
 
 def default_renderer(width: int, height: int, hooks: HookBus) -> EffectsRenderer:
-    """The canonical effect roster Aether ships with.
+    """The canonical effect roster Conjure ships with.
 
-    Order matters for FG layering: things that should sit beneath others
-    are added first.
+    Registration order:
+    - BG effects first (they mutate the camera frame in registration order).
+    - FG effects after (composited additively; listed bottom-to-top visually).
     """
     r = EffectsRenderer(width, height, hooks)
-    # Background warp first
+
+    # --- Background (camera-warp) effects ------------------------------------
     r.add(SpaceStretchEffect(width, height))
-    # Foreground effects
+    r.add(TimeFreezeEffect(width, height))
+
+    # --- Foreground (additive overlay) effects --------------------------------
+    # ProjectileField is always-on (no ability_name) — registered first so that
+    # ability-specific glow layers draw on top of flying projectiles.
+    r.add(ProjectileField(width, height, hooks))
+    r.add(TimeShatter(width, height, hooks))
     r.add(KamehamehaEffect(width, height))
     r.add(RasenganEffect(width, height))
+    r.add(FireballEffect(width, height))
     r.add(ChidoriEffect(width, height))
+    r.add(FrostNovaEffect(width, height))
+    # MeltCanvas is always-on (no ability_name): it blits the persistent laser
+    # "drawing" every frame, even after the laser turns off, so written letters
+    # stay until cleared with 'R'. Registered before LaserEyes so the live beams
+    # draw on top of the accumulated trail.
+    melt = MeltCanvas(width, height)
+    r.melt_canvas = melt
+    r.add(melt)
+    r.add(LaserEyesEffect(width, height, melt))
     r.add(RealityTearEffect(width, height))
+
     return r

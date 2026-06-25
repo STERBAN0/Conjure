@@ -6,8 +6,13 @@ render loop; subscribers must stay cheap.
 """
 
 from __future__ import annotations
+
+import logging
 from collections import defaultdict
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
+
+log = logging.getLogger(__name__)
 
 
 class HookBus:
@@ -18,13 +23,14 @@ class HookBus:
         self._subs[event].append(fn)
 
     def off(self, event: str, fn: Callable[..., None]) -> None:
-        if fn in self._subs[event]:
-            self._subs[event].remove(fn)
+        subs = self._subs.get(event, [])
+        if fn in subs:
+            subs.remove(fn)
 
     def emit(self, event: str, *args: Any, **kwargs: Any) -> None:
         # Iterate over a snapshot so subscribers may mutate during dispatch.
         for fn in list(self._subs.get(event, ())):
             try:
                 fn(*args, **kwargs)
-            except Exception as e:  # never let one effect crash the loop
-                print(f"[hooks] subscriber for '{event}' raised: {e!r}")
+            except Exception:  # never let one effect crash the loop
+                log.warning("subscriber for '%s' raised", event, exc_info=True)

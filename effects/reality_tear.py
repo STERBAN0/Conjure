@@ -9,13 +9,12 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Tuple
 
 import numpy as np
 import pygame
 
 import config
-from core.state import AbilityState, GestureSignals, FrameState
+from core.state import AbilityState, GestureSignals
 from effects.base import LAYER_FG, Effect
 from effects.utils import (
     additive_circle,
@@ -86,8 +85,8 @@ class RealityTearEffect(Effect):
             noise += np.sin(ts * freq * math.pi * 2 + self._noise_phase * (1 + k)) / (k + 1)
         noise *= amp / 2.0
 
-        points: list[Tuple[float, float]] = []
-        for t, val in zip(ts, noise):
+        points: list[tuple[float, float]] = []
+        for t, val in zip(ts, noise, strict=False):
             base = p0 * (1 - t) + p1 * t
             points.append((float(base[0] + nx * val), float(base[1] + ny * val)))
 

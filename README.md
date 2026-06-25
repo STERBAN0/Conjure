@@ -1,34 +1,39 @@
-# Aether
+# Conjure
+
+[![tests](https://github.com/STERBAN0/conjure/actions/workflows/tests.yml/badge.svg)](https://github.com/STERBAN0/conjure/actions/workflows/tests.yml)
 
 > Real-time gesture-driven anime ability effects. Make a Sasuke seal and
 > watch lightning crackle from your palm. Cup your hands together for a
 > Kamehameha. Pull space apart between your hands like a stretched
-> rubber band. All from a webcam, no controllers, no marker setup.
+> rubber band. Close your eyes, open them, and fire twin laser beams.
+> All from a webcam, no controllers, no marker setup.
 
-Aether watches your hands through a regular webcam, classifies what
+<!-- demo video goes here -->
+_Demo video coming soon._
+
+Conjure watches your hands (and face) through a regular webcam, classifies what
 *pose* you're holding, and plays the matching anime ability with
 charging, release motion, and cooldown. Only one ability is active at a
 time, so the input is always unambiguous — the system feels like a
 fighting-game move list rather than a noise of overlapping VFX.
 
-## Demo
-
-![Aether demo](docs/demo.gif)
-
-See [`docs/DEMO.md`](docs/DEMO.md) for capture instructions and the demo GIF generation script.
+## Pipeline
 
 ```
                           ┌─────────────┐
         webcam  ───────►  │ HandTracker │  21 landmarks/hand, smoothed
                           └──────┬──────┘
-                                 ▼
-                         ┌──────────────┐
-                         │GestureEngine │  continuous signals
-                         └──────┬───────┘    (span, expansion, motion, ...)
-                                ▼
-                     ┌──────────────────┐
-                     │  PoseRecognizer  │  discrete poses + confidences
-                     └────────┬─────────┘
+                                 │         ┌─────────────┐
+                                 │         │ FaceTracker │  eye-closed state (cadenced)
+                                 │         └──────┬──────┘
+                                 ▼                ▼
+                         ┌──────────────────────────┐
+                         │      GestureEngine        │  continuous signals
+                         └──────────┬────────────────┘  (span, expansion, motion, ...)
+                                    ▼
+                     ┌──────────────────────┐
+                     │   PoseRecognizer     │  discrete poses + hysteresis
+                     └────────┬─────────────┘
                               ▼
                      ┌──────────────────┐  charging → active → cooldown
                      │  AbilityRouter   │  exactly one ability at a time
@@ -36,48 +41,88 @@ See [`docs/DEMO.md`](docs/DEMO.md) for capture instructions and the demo GIF gen
                               ▼
                      ┌──────────────────┐
                      │ EffectsRenderer  │  only the active effect runs
-                     └────────┬─────────┘
+                     └────────┬─────────┘  (+ ProjectileField for thrown abilities)
                               ▼
-                            pygame
+                           pygame
 ```
 
 ## Abilities
 
-| Ability         | Pose                                                                  | Release                  | Visual                                                  |
-|-----------------|------------------------------------------------------------------------|--------------------------|---------------------------------------------------------|
-| **Chidori**     | Sasuke seal — index + middle extended, others folded                  | Forward thrust           | Cyan-white lightning arcs branching from the palm       |
-| **Kamehameha**  | Both hands cupped, palms facing, fingertips touching                  | Hands shoot apart        | Charging sphere → wide cylindrical beam                 |
-| **Rasengan**    | Open palm + fist hovering above it                                    | Forward thrust           | Spinning blue sphere with a defined orbital shell       |
-| **Space stretch** | Both hands open, spread, palms facing each other                    | (continuous while held)  | Camera frame sheared along the hand-to-hand axis       |
-| **Reality tear** | Both hands clawed, held apart                                        | (continuous while held)  | Jagged glowing fracture between the hands               |
+| Ability | Gesture | Charge | Fire |
+|---|---|---|---|
+| **Fireball** | 1 hand: only the index finger pointing up | charge once | FLICK the finger to shoot — unlimited shots while the pose is held |
+| **Rasengan** | 2 hands stacked: lower cupped palm UP, top hand stirs in a circle | stir to spin | FLICK to throw → slow-drifting sphere, bursts at the frame edge |
+| **Chidori** | 1 hand: index + middle extended (V), ring + pinky folded | hold | HOLD — lightning blade stays while the sign is held |
+| **Kamehameha** | 2 open hands raised together, palms to camera, index fingertips & thumbs touching to form a triangle/diamond | hold | AIM the cup: face the camera → blast fires at you and floods the screen blue; tilt to a side → the beam shoots that way |
+| **Frost Nova** | 2 hands crossed at the wrists (X) | hold | SPREAD (uncross) → frost ring + ice cracks that span the whole screen |
+| **Laser Eyes** | close BOTH eyes (face sign, no hands) | eyes shut ~1 s (the whine builds) | OPEN your eyes to fire — twin beams CONVERGE to one point that you aim with your HEAD and EYES together; it starts on your own face (no dead zone — reach anywhere, even yourself) and melts a trail you can draw/write with (a smiley, "HI"); eyes shut again to stop; `R` clears the drawing |
+| **Space Stretch** | 2 open palms facing each other, pulled apart | none — just happens | the frame shears/stretches along the hand axis, growing as you separate |
+| **Reality Tear** | 2 fists bumped together, then ripped apart | bump to charge | RIP APART → jagged glowing fracture tears open between the hands |
+| **Time Freeze** | 1 closed fist, palm facing the camera | hold ~2.5 s | the scene slows to a freeze, then shatters like glass on release |
+
+Press **M** in-app to open the hand-sign manual with cartoon illustrations of each pose. See [`docs/MANUAL.md`](docs/MANUAL.md) for the full written reference.
 
 ## Quick start
 
-### Windows (PowerShell)
+### System prerequisites
+
+`sounddevice` needs PortAudio on macOS and Linux. Install it before running:
+
+- **macOS:** `brew install portaudio`
+- **Linux:** `sudo apt-get install libportaudio2`
+- **Windows:** nothing extra needed.
+
+If PortAudio is missing, the app starts anyway — ability sound effects are
+silenced, but everything visual works normally.
+
+### End-user install
+
+#### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/<you>/aether
-cd aether
+git clone https://github.com/STERBAN0/conjure
+cd conjure
 py -3.13 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe scripts/download_model.py
 .\.venv\Scripts\python.exe main.py
 ```
 
-### macOS / Linux
+#### macOS / Linux
 
 ```bash
-git clone https://github.com/<you>/aether
-cd aether
+git clone https://github.com/STERBAN0/conjure
+cd conjure
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -r requirements.txt
 python scripts/download_model.py
 python main.py
 ```
 
-The model is `~7.5 MB`. The download script is idempotent — re-running
-it does nothing if the file is already there.
+The download script fetches both `hand_landmarker.task` (~7.5 MB) and
+`face_landmarker.task` (~6 MB). It's idempotent — re-running it skips
+files that are already there. The face model is only needed for Laser
+Eyes; if it's missing the app logs a hint and continues without it.
+
+Audio SFX (`audio/sfx/`) are committed to the repo, so sound works immediately
+after cloning without any extra generation step.
+
+### For contributors
+
+Use the editable dev install instead:
+
+```powershell
+# Windows
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+```
+
+```bash
+# macOS / Linux
+pip install -e ".[dev]"
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor setup.
 
 ### Tested with
 
@@ -88,12 +133,16 @@ it does nothing if the file is already there.
 
 ## Controls
 
-| Key              | What it does                              |
-|------------------|-------------------------------------------|
-| `ESC` / `Q`      | Quit                                       |
-| `H`              | Toggle the minimal HUD (ability label)    |
-| `D`              | Toggle the debug overlay (signals + poses)|
-| `S`              | Save a screenshot to `./screenshots/`     |
+| Key | What it does |
+|---|---|
+| `Q` | Quit |
+| `ESC` | Close the manual (when it's open) — does **not** quit |
+| `H` | Toggle the minimal HUD (ability label, charge, cooldown) |
+| `D` | Toggle the debug overlay (signals + poses + face mask) |
+| `M` | Toggle the in-app hand-sign manual (←/→ to page) |
+| `L` | Toggle Laser Eyes / face tracking on/off |
+| `R` | Clear the Laser Eyes molten "drawing" from the screen |
+| `S` | Save a screenshot to `./screenshots/` |
 
 ## How it feels
 
@@ -101,11 +150,13 @@ Every ability has the same loop:
 
 1. **Make the pose.** A confidence indicator appears around the hand.
 2. **Hold to charge.** A ring fills around the active hand. Charge time
-   varies — Chidori is fast, Kamehameha is dramatic.
-3. **Release.** Some abilities (Chidori, Rasengan) fire on a forward
-   thrust; some (Kamehameha) on hands shooting apart; continuous ones
-   (Space stretch, Reality tear) just stay live while you
-   hold the pose.
+   varies — Chidori is fast, Time Freeze takes a full 2.5 seconds.
+3. **Release.** Thrown abilities (Rasengan, Fireball) fire on a wrist
+   flick and fly until they reach the frame edge. Melee abilities
+   (Chidori) fire on a forward thrust. Spread abilities (Kamehameha,
+   Frost Nova) fire when the hands fly apart. Continuous abilities
+   (Space Stretch, Reality Tear, Time Freeze) stay live while you hold
+   the pose.
 4. **Cooldown.** Brief pause where you can't immediately start another
    ability — keeps the impact of the release intact.
 
@@ -119,7 +170,7 @@ infinite.
 ## Project layout
 
 ```
-aether/
+conjure/
 ├── config.py                     all tunables in one place
 ├── main.py                       60 Hz pipeline + pygame loop
 ├── core/
@@ -127,11 +178,12 @@ aether/
 │   └── hooks.py                  tiny synchronous pub/sub bus
 ├── vision/
 │   ├── camera.py                 threaded webcam capture
-│   └── hand_tracker.py           MediaPipe + One Euro smoothing + mirror fix
+│   ├── hand_tracker.py           MediaPipe + One Euro smoothing + mirror fix
+│   └── face_tracker.py           MediaPipe face landmarker (eye-closed state)
 ├── gestures/
 │   ├── smoothing.py              OneEuroFilter, EMA
 │   ├── engine.py                 raw hands -> continuous signals
-│   ├── poses.py                  discrete pose classifier
+│   ├── poses.py                  discrete pose classifier (+ hysteresis)
 │   └── router.py                 single-slot ability state machine
 ├── effects/
 │   ├── base.py                   Effect base class
@@ -139,29 +191,66 @@ aether/
 │   ├── chidori.py                lightning blade
 │   ├── kamehameha.py             sphere + beam
 │   ├── rasengan.py               spinning sphere
+│   ├── fireball.py               turbulent ember sphere
+│   ├── frost_nova.py             frost ring + ice shards
+│   ├── laser_eyes.py             twin eye beams + molten draw trail
 │   ├── space_stretch.py          elastic membrane (BG warp)
 │   ├── reality_tear.py           jagged fracture
+│   ├── time_freeze.py            desaturate + slow-mo
+│   ├── time_shatter.py           glass-shatter burst on time-freeze release
+│   ├── projectiles.py            flying projectile field (Rasengan, Fireball)
 │   ├── renderer.py               composes everything
-│   └── hud.py                    minimal + debug overlays
-├── audio/analyzer.py             threaded mic + 8-band FFT (optional)
-├── system/controls.py            Windows volume gesture (optional)
-├── models/                       hand_landmarker.task (downloaded)
-├── scripts/download_model.py     cross-platform model fetch
+│   └── hud.py                    ability strip, charge ring, cooldown, debug
+├── audio/
+│   ├── analyzer.py               threaded mic + 8-band FFT (optional)
+│   ├── sounds.py                 hook-driven ability SFX playback
+│   └── sfx/                      per-ability charge/ready/cast WAV cues (committed)
+├── system/
+│   ├── controls.py               Windows volume gesture (optional)
+│   └── manual.py                 in-app hand-sign manual overlay
+├── models/                       hand_landmarker.task + face_landmarker.task
+├── scripts/
+│   ├── download_model.py         fetches both model files (idempotent)
+│   ├── generate_sfx.py           synthesises the ability SFX into audio/sfx/
+│   ├── export_manual.py          renders manual pages to docs/manual_images/
+│   └── diagnose_video.py         offline pose/finger diagnostics on a clip
+├── docs/
+│   ├── MANUAL.md                 full ability reference with hand-sign images
+│   └── manual_images/            cartoon hand-sign PNGs (one per ability)
 └── tests/                        pytest unit tests
 ```
 
 ## How the pipeline stays smooth
 
-Two places to look:
+Three places to look:
 
 - **`vision/hand_tracker.py`** smooths every landmark with a One Euro
   filter (cutoff frequency adapts to the signal's own velocity, so
-  things stay still when still and responsive when fast). The handedness
-  fix that makes Left/Right correct under a mirrored selfie view also
-  lives here.
+  things stay still when still and responsive when fast). Finger curl is
+  derived from PIP joint angles rather than simple tip-to-palm
+  distances, and palm-normal orientation is estimated per-frame so poses
+  that require the palm to face the camera or face each other are
+  reliably separable. The handedness fix that makes Left/Right correct
+  under a mirrored selfie view also lives here.
 - **`gestures/engine.py`** smooths each derived signal again. Two-stage
-  smoothing buys you "stable when not moving" *and* "snappy when you
+  smoothing buys "stable when not moving" and "snappy when you
   are" — neither alone is enough.
+- **`gestures/poses.py`** adds temporal hysteresis: a pose only
+  becomes active after its raw confidence stays above
+  `POSE_ENTER_THRESHOLD` for `POSE_ENTER_FRAMES` consecutive frames and
+  only drops when it falls below the lower `POSE_EXIT_THRESHOLD`. This
+  kills the flickering and false-fires that happen when you're
+  transitioning between gestures.
+
+The face pipeline (`vision/face_tracker.py`) runs at a reduced cadence
+controlled by `FACE_DETECT_EVERY_N_FRAMES` in `config.py`, so it never
+bottlenecks the main 60 Hz loop. If the face model isn't downloaded, it
+degrades gracefully — Laser Eyes is simply unavailable and everything
+else runs normally.
+
+Thrown projectiles (Rasengan, Fireball) leave the hand on release and
+travel in their throw direction until they reach the frame edge, where
+they burst. No depth or object detection — travel-to-edge is the design.
 
 If the hands jitter: raise `ONE_EURO_BETA` in `config.py` slightly. If
 they feel laggy on fast moves: raise it more. If the volume gesture
@@ -179,13 +268,23 @@ version is:
    setting `ability_name`. Override the lifecycle hooks
    (`on_enter`, `on_release`, ...) you care about.
 5. Register the effect in `effects/renderer.py::default_renderer()`.
-6. Add tests in `tests/` — fixtures for hand-crafted landmark sets are
+6. Add a manual entry in `system/manual.py` and `docs/MANUAL.md`.
+7. Add tests in `tests/` — fixtures for hand-crafted landmark sets are
    already in `tests/conftest.py`.
+
+## Using with Claude Code
+
+This repo ships a `CLAUDE.md` so Claude Code understands the architecture
+from the first message. Contributors can open the repo with Claude Code
+and ask it to add a new ability by following the steps in
+[CONTRIBUTING.md](CONTRIBUTING.md) — the architecture context is already
+loaded. `CLAUDE.md` also documents the test command and lint setup so
+Claude Code can run checks without prompting.
 
 ## Testing
 
 ```bash
-pytest                    # all 27 tests, ~1 s
+pytest                    # all tests, ~1 s
 pytest -k poses           # just the pose classifier
 pytest --cov=.            # with coverage
 ```
@@ -198,6 +297,8 @@ visual-regression material — eyeball them in `main.py`.
 
 - **"Cannot open camera 0"** — change `CAM_INDEX` in `config.py`.
 - **"Hand landmarker model not found"** — run `python scripts/download_model.py`.
+- **Laser Eyes never activates** — the face model isn't downloaded. Run
+  `python scripts/download_model.py`; it fetches both models.
 - **No audio reactivity** — first run prints the reason. Usually missing
   PortAudio. The system falls back to silent operation; effects that
   read `audio_level` just see `0.0`.
@@ -208,17 +309,19 @@ visual-regression material — eyeball them in `main.py`.
   default is for headroom.
 - **Wrong hand labelled Left/Right** — your camera may already mirror in
   firmware. Set `INVERT_HANDEDNESS_AFTER_MIRROR = False`.
+- **Pose won't activate / activates then immediately drops** — open the
+  debug overlay (`D`) and watch the confidence readouts. The hysteresis
+  requires `POSE_ENTER_FRAMES` (default 4) consecutive frames above
+  `POSE_ENTER_THRESHOLD` (default 0.55). Tweak those in `config.py` if
+  your camera or lighting is borderline.
 
 ## Roadmap
 
-- Palm-normal estimation so the Kamehameha beam aims where the hands
-  actually point, not "screen-up".
 - GLSL backend for arc-heavy effects via `moderngl`.
-- Sound effects layered on `ability_release` events.
 - Per-user pose calibration mode.
 - Two-player split-screen.
 
-## Engineering Notes
+## Engineering notes
 
 The effects layer originally dropped frames badly whenever multiple abilities
 were active. The root cause was an allocation pattern, not raw math: every
@@ -239,8 +342,8 @@ fixed to fade correctly (it now pre-scales color by alpha and uses
 Measured on a representative peak-Chidori frame, the effects render path went
 from about **162 ms/frame (~6 FPS ceiling) to 2.8 ms/frame — roughly 58×
 faster** — eliminating the frame drops. Verified with the existing test suite
-(27 passing) plus a headless render smoke test covering off-screen,
-edge-straddling, and zero-length primitives.
+plus a headless render smoke test covering off-screen, edge-straddling, and
+zero-length primitives.
 
 Takeaway: the win came from not doing expensive work that wasn't needed, not
 from optimizing the arithmetic.

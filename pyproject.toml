@@ -1,12 +1,12 @@
 [project]
-name = "aether"
+name = "conjure"
 version = "0.2.0"
 description = "Real-time gesture-driven anime ability effects (Chidori, Kamehameha, Rasengan, ...)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "Rakan" },
+    { name = "STERBAN0" },
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -41,11 +41,11 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Rakan/aether"
-Issues = "https://github.com/Rakan/aether/issues"
+Homepage = "https://github.com/STERBAN0/conjure"
+Issues = "https://github.com/STERBAN0/conjure/issues"
 
 [project.scripts]
-aether = "main:main"
+conjure = "main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

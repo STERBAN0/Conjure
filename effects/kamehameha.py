@@ -8,30 +8,30 @@ Two visual phases:
     rings expand outward.
 
   ACTIVE (post-release):
-    Cylindrical beam from the midpoint of the hands, aimed away from the
-    user (we approximate "away" as the perpendicular pointing toward the
-    top of the frame, biased away from screen-centre). Hot white core,
-    cyan outer layer, swirling particles around it. Sustains for the
-    ability's `active_duration`.
+    The blast travels where the cupped palms point (see _track_aim). Face the
+    cup at the camera and it fires at the viewer: the screen floods with the
+    beam's blue light (an expanding bloom from the sphere plus a blue veil that
+    builds to a near-total engulf, then recedes on release). Tilt the cup to a
+    side and the cylindrical beam shoots toward that screen edge instead, with
+    little to no screen engulf. Sustains for the ability's `active_duration`.
 """
 
 from __future__ import annotations
 
 import math
 import random
-from typing import Tuple
 
 import numpy as np
 import pygame
 
 import config
 from core.state import (
-    AbilityState,
-    FrameState,
-    GestureSignals,
     PHASE_ACTIVE,
     PHASE_CHARGING,
     PHASE_RELEASING,
+    AbilityState,
+    FrameState,
+    GestureSignals,
 )
 from effects.base import LAYER_FG, Effect
 from effects.utils import (
@@ -43,6 +43,10 @@ from effects.utils import (
     jagged_path,
     radial_glow,
 )
+
+# Upper bound on active-phase particle count. At 12 spawns/frame × 60 fps the
+# list would grow to ~3600 particles over 5 s without a cap.
+_MAX_PARTICLES = 1200
 
 
 class _Particle:
@@ -69,12 +73,20 @@ class KamehamehaEffect(Effect):
         self._next_wave_t = 0.0
         self._beam_pulse = 0.0
         self._flash = 0.0
+        # Aim: a smoothed screen-plane direction the blast travels, plus how
+        # squarely the palms face the camera (engulf strength). Updated while
+        # CHARGING and FROZEN at the moment of firing, so the beam keeps the
+        # direction you aimed it. Default = straight at the viewer.
+        self._aim_axis = np.array([0.0, -1.0], dtype=np.float32)
+        self._aim_engulf = 1.0
 
     def on_enter(self, frame: FrameState, signals: GestureSignals) -> None:
         self._particles.clear()
         self._shockwaves.clear()
         self._next_wave_t = 0.4
         self._flash = 0.0
+        self._aim_axis = np.array([0.0, -1.0], dtype=np.float32)
+        self._aim_engulf = 1.0
 
     def on_release(self, intensity: float, frame: FrameState) -> None:
         self._flash = max(self._flash, intensity)
@@ -100,6 +112,9 @@ class KamehamehaEffect(Effect):
         self._shockwaves = [age + dt for age in self._shockwaves if age + dt < 1.0]
 
         if ability.phase == PHASE_CHARGING:
+            # Track where the cupped palms point so the blast fires that way; the
+            # aim is frozen once we leave CHARGING (i.e. at the instant of firing).
+            self._track_aim(ability)
             self._update_charge(signals, dt, ability)
         elif ability.phase == PHASE_ACTIVE:
             self._update_active(signals, dt, ability)
@@ -135,17 +150,18 @@ class KamehamehaEffect(Effect):
         # Spawn beam-aligned particles streaming outward.
         cx, cy = self._sphere_center(ability)
         ax, ay = self._beam_axis(ability)
-        for _ in range(12):
-            spread = self._rng.uniform(-25, 25)
-            px = cx + spread * (-ay)
-            py = cy + spread * ax
-            speed = self._rng.uniform(700, 1400)
-            self._particles.append(_Particle(
-                pos=(px, py),
-                vel=(ax * speed, ay * speed),
-                life=self._rng.uniform(0.2, 0.45),
-                size=self._rng.uniform(2, 5),
-            ))
+        if len(self._particles) < _MAX_PARTICLES:
+            for _ in range(12):
+                spread = self._rng.uniform(-25, 25)
+                px = cx + spread * (-ay)
+                py = cy + spread * ax
+                speed = self._rng.uniform(700, 1400)
+                self._particles.append(_Particle(
+                    pos=(px, py),
+                    vel=(ax * speed, ay * speed),
+                    life=self._rng.uniform(0.2, 0.45),
+                    size=self._rng.uniform(2, 5),
+                ))
         if self._next_wave_t <= 0.0:
             self._shockwaves.append(0.0)
             self._next_wave_t = 0.18
@@ -175,9 +191,13 @@ class KamehamehaEffect(Effect):
             self._render_sphere(target, ability, scale=1.2)
             self._render_beam(target, ability, signals)
             self._render_shockwaves(target, ability)
+            # Flood the screen with blue light only when the blast is aimed at the
+            # viewer; a side-aimed shot just sends the beam toward that edge.
+            self._render_screen_engulf(target, ability)
         elif ability.phase == PHASE_RELEASING:
-            # Fading beam
+            # Fading beam + receding engulf
             self._render_beam(target, ability, signals, fade=True)
+            self._render_screen_engulf(target, ability)
 
         if self._flash > 0:
             draw_screen_flash(
@@ -220,6 +240,54 @@ class KamehamehaEffect(Effect):
                     alpha=int(alpha_scale * ability.charge),
                     width=max(1, int(2 + 2 * ability.charge)),
                 )
+
+    def _render_screen_engulf(
+        self, target: pygame.Surface, ability: AbilityState
+    ) -> None:
+        """Flood the screen with blue light, as if the blast is coming at you.
+
+        Ramps up over the first third of the active phase, then recedes during
+        release. An expanding blue bloom punches out from the sphere toward the
+        whole frame, and a blue veil engulfs everything (additive flash).
+        """
+        if ability.phase == PHASE_ACTIVE:
+            dur = max(1e-3, config.ABILITY_ACTIVE_DURATION.get("kamehameha", 1.5))
+            ramp = min(1.0, (ability.phase_age / dur) / 0.35)
+        elif ability.phase == PHASE_RELEASING:
+            ramp = max(0.0, 1.0 - ability.phase_age / 0.3)
+        else:
+            return
+        # Only engulf when the blast is aimed at the screen; a side-aimed shot
+        # barely floods (the directional beam is the whole show then).
+        ramp *= self._aim_engulf
+        if ramp <= 0.0:
+            return
+
+        intensity = max(0.6, float(ability.intensity))
+        pulse = 0.9 + 0.1 * math.sin(self._beam_pulse * 10.0)
+        cx, cy = self._sphere_center(ability)
+        diag = (self.width ** 2 + self.height ** 2) ** 0.5
+
+        # Expanding blue bloom from the sphere outward toward full screen.
+        bloom_r = int(self._sphere_radius(ability) + ramp * diag * 0.85 * pulse)
+        radial_glow(
+            target, (cx, cy), bloom_r,
+            color=config.KAMEHAMEHA_ENGULF_COLOR,
+            alpha=int(150 * ramp * intensity),
+            layers=14,
+        )
+        # Bright forward core punching at the viewer.
+        radial_glow(
+            target, (cx, cy),
+            int(self._sphere_radius(ability) * (1.5 + 3.0 * ramp)),
+            color=config.KAMEHAMEHA_CORE_COLOR,
+            alpha=int(210 * ramp),
+            layers=10,
+        )
+        # Blue veil engulfing the whole frame.
+        veil = int(config.KAMEHAMEHA_ENGULF_MAX_ALPHA * ramp * intensity)
+        if veil > 0:
+            draw_screen_flash(target, config.KAMEHAMEHA_ENGULF_COLOR, veil)
 
     def _render_shockwaves(
         self, target: pygame.Surface, ability: AbilityState
@@ -345,10 +413,10 @@ class KamehamehaEffect(Effect):
     def _draw_thick_line(
         self,
         target: pygame.Surface,
-        start: Tuple[float, float],
-        end: Tuple[float, float],
+        start: tuple[float, float],
+        end: tuple[float, float],
         thickness: int,
-        color: Tuple[int, int, int],
+        color: tuple[int, int, int],
         alpha: int,
     ) -> None:
         if thickness <= 0 or alpha <= 0:
@@ -359,7 +427,7 @@ class KamehamehaEffect(Effect):
 
     # ------------------------------------------------------------------
 
-    def _sphere_center(self, ability: AbilityState) -> Tuple[int, int]:
+    def _sphere_center(self, ability: AbilityState) -> tuple[int, int]:
         a, b = ability.primary_hand, ability.secondary_hand
         if a is None or b is None:
             return (self.width // 2, self.height // 2)
@@ -374,31 +442,75 @@ class KamehamehaEffect(Effect):
                - config.KAMEHAMEHA_SPHERE_RADIUS_BASE) * ease_in_out_quad(ability.charge)
         )
 
-    def _beam_axis(self, ability: AbilityState) -> Tuple[float, float]:
-        """Return a unit (dx, dy) describing where the beam points.
+    def _beam_axis(self, ability: AbilityState) -> tuple[float, float]:
+        """The smoothed screen-plane direction the beam travels (see _track_aim)."""
+        return float(self._aim_axis[0]), float(self._aim_axis[1])
 
-        Heuristic: the perpendicular to the inter-hand vector, pointing
-        toward the screen edge furthest from the midpoint. That is "outward
-        from the user", which usually feels correct given selfie framing.
+    def _track_aim(self, ability: AbilityState) -> None:
+        """Update the smoothed aim from where the cupped palms point.
+
+        The averaged palm normal splits into a screen-plane lateral component
+        (where on screen the cup points) and a toward-camera forward component.
+        Facing the camera → fire at the viewer + full engulf; tilting the cup to
+        a side → the beam (and a much smaller engulf) goes that way. Smoothed with
+        an EMA to fight palm-normal jitter.
         """
+        raw = self._compute_aim(ability)
+        if raw is None:
+            return
+        axis, engulf = raw
+        alpha = 0.3
+        self._aim_axis = (
+            self._aim_axis * (1.0 - alpha) + axis * alpha
+        ).astype(np.float32)
+        n = float(np.linalg.norm(self._aim_axis))
+        if n > 1e-6:
+            self._aim_axis = (self._aim_axis / n).astype(np.float32)
+        self._aim_engulf = self._aim_engulf * (1.0 - alpha) + engulf * alpha
+
+    def _compute_aim(
+        self, ability: AbilityState
+    ) -> tuple[np.ndarray, float] | None:
+        """Raw (screen-plane axis, engulf strength 0..1) from the palm normals."""
         a, b = ability.primary_hand, ability.secondary_hand
         if a is None or b is None:
-            return (0.0, -1.0)
+            return None
+        n = (
+            np.asarray(a.palm_normal, dtype=np.float32)
+            + np.asarray(b.palm_normal, dtype=np.float32)
+        ) * 0.5
+        lat = np.array([float(n[0]), float(n[1])], dtype=np.float32)
+        lat_mag = float(np.linalg.norm(lat))
+        fwd = -float(n[2])   # >0 => palms face the camera (aiming at the viewer)
+
+        # Aiming at the screen: little lateral tilt, or the palms face the camera
+        # more than they point sideways. Keep the screen-outward fallback axis for
+        # the (mostly washed-out) beam and engulf the screen, scaled by how flat
+        # the palms face the camera.
+        if lat_mag < config.KAMEHAMEHA_AIM_LATERAL_MIN or fwd >= lat_mag:
+            axis = self._fallback_axis(ability)
+            engulf = float(np.clip((fwd + 0.1) * 1.8, 0.45, 1.0))
+            return axis, engulf
+
+        # Aiming to a side: fire along the lateral palm direction, no screen flood.
+        axis = (lat / (lat_mag + 1e-6)).astype(np.float32)
+        return axis, 0.0
+
+    def _fallback_axis(self, ability: AbilityState) -> np.ndarray:
+        """Screen-outward heuristic axis (perpendicular to the inter-hand vector,
+        pointing toward the furthest screen edge) used when aiming at the viewer
+        or when palm normals are degenerate."""
+        a, b = ability.primary_hand, ability.secondary_hand
+        if a is None or b is None:
+            return np.array([0.0, -1.0], dtype=np.float32)
         diff = b.palm - a.palm
-        # Two perpendiculars
-        perp1 = np.array([-diff[1], diff[0]])
-        perp2 = -perp1
-        norm = np.linalg.norm(perp1) + 1e-6
+        perp1 = np.array([-diff[1], diff[0]], dtype=np.float32)
+        norm = float(np.linalg.norm(perp1)) + 1e-6
         perp1 /= norm
-        perp2 /= norm
-        # Pick the one pointing further from screen centre
+        perp2 = -perp1
         cx, cy = self._sphere_center(ability)
         screen_mid = np.array([self.width * 0.5, self.height * 0.5])
-        center_px = np.array([cx, cy])
-        # Compare candidate directions in pixel space.
-        p1 = center_px + perp1 * 200.0
-        p2 = center_px + perp2 * 200.0
-        d1 = np.linalg.norm(p1 - screen_mid)
-        d2 = np.linalg.norm(p2 - screen_mid)
-        chosen = perp1 if d1 >= d2 else perp2
-        return float(chosen[0]), float(chosen[1])
+        center_px = np.array([cx, cy], dtype=np.float32)
+        d1 = float(np.linalg.norm(center_px + perp1 * 200.0 - screen_mid))
+        d2 = float(np.linalg.norm(center_px + perp2 * 200.0 - screen_mid))
+        return perp1 if d1 >= d2 else perp2

@@ -21,7 +21,6 @@ fast movements.
 from __future__ import annotations
 
 import math
-from typing import Optional
 
 import numpy as np
 
@@ -40,9 +39,9 @@ class GestureEngine:
         self._grip_f = OneEuroFilter(mincutoff=2.0, beta=0.05)
         self._motion_ema = EMA(alpha=1.0 - config.MOTION_ENERGY_DECAY)
 
-        self._prev_span: Optional[float] = None
-        self._prev_angle: Optional[float] = None
-        self._prev_t: Optional[float] = None
+        self._prev_span: float | None = None
+        self._prev_angle: float | None = None
+        self._prev_t: float | None = None
 
     def update(self, frame: FrameState) -> GestureSignals:
         s = self.signals

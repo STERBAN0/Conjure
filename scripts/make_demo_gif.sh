@@ -17,9 +17,9 @@ FPS="${FPS:-15}"
 WIDTH="${WIDTH:-960}"
 
 # Generate palette for high-quality GIF
-ffmpeg -i "$IN" -vf "fps=${FPS},scale=${WIDTH}:-1:flags=lanczos,palettegen" -y /tmp/aether_palette.png
+ffmpeg -i "$IN" -vf "fps=${FPS},scale=${WIDTH}:-1:flags=lanczos,palettegen" -y /tmp/conjure_palette.png
 
 # Convert video to GIF using palette
-ffmpeg -i "$IN" -i /tmp/aether_palette.png -lavfi "fps=${FPS},scale=${WIDTH}:-1:flags=lanczos[x];[x][1:v]paletteuse" -loop 0 -y "$OUT"
+ffmpeg -i "$IN" -i /tmp/conjure_palette.png -lavfi "fps=${FPS},scale=${WIDTH}:-1:flags=lanczos[x];[x][1:v]paletteuse" -loop 0 -y "$OUT"
 
 echo "Wrote $OUT"

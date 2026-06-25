@@ -2,7 +2,7 @@
 
 Everything here is pure: takes a target Surface + parameters, draws into it,
 returns nothing. No effect should reach for pygame.draw directly when one of
-these helpers fits — they bake in the additive-blend conventions Aether uses.
+these helpers fits — they bake in the additive-blend conventions Conjure uses.
 """
 
 from __future__ import annotations
@@ -10,12 +10,11 @@ from __future__ import annotations
 import colorsys
 import math
 import random
-from typing import Sequence, Tuple
+from collections.abc import Sequence
 
-import numpy as np
 import pygame
 
-ColorRGB = Tuple[int, int, int]
+ColorRGB = tuple[int, int, int]
 
 
 def hsv_to_rgb(h: float, s: float, v: float) -> ColorRGB:
@@ -32,9 +31,19 @@ def lerp_color(a: ColorRGB, b: ColorRGB, t: float) -> ColorRGB:
     )
 
 
+# --- Per-size surface caches for frequently called primitives ---------------
+# Each cache maps a params tuple → a reusable SRCALPHA surface. The surface is
+# cleared (fill (0,0,0,0)) before each use so prior drawing does not persist.
+# This avoids per-call heap allocation without changing visual output.
+
+_circle_cache: dict[int, pygame.Surface] = {}
+_ring_cache: dict[tuple[int, int], pygame.Surface] = {}
+_glow_cache: dict[tuple[int, int], pygame.Surface] = {}
+
+
 def additive_circle(
     surf: pygame.Surface,
-    center: Tuple[int, int],
+    center: tuple[int, int],
     size: int,
     color: ColorRGB,
     alpha: int,
@@ -42,7 +51,11 @@ def additive_circle(
     """Draw an additive-blended circle. `size` is the radius in pixels."""
     if size <= 0 or alpha <= 0:
         return
-    s = pygame.Surface((size * 2 + 2, size * 2 + 2), pygame.SRCALPHA)
+    s = _circle_cache.get(size)
+    if s is None:
+        s = pygame.Surface((size * 2 + 2, size * 2 + 2), pygame.SRCALPHA)
+        _circle_cache[size] = s
+    s.fill((0, 0, 0, 0))
     pygame.draw.circle(s, (*color, max(0, min(255, alpha))), (size + 1, size + 1), size)
     surf.blit(
         s, (center[0] - size - 1, center[1] - size - 1),
@@ -52,7 +65,7 @@ def additive_circle(
 
 def additive_ring(
     surf: pygame.Surface,
-    center: Tuple[int, int],
+    center: tuple[int, int],
     radius: int,
     color: ColorRGB,
     alpha: int,
@@ -62,7 +75,12 @@ def additive_ring(
     if radius <= 0 or alpha <= 0 or width <= 0:
         return
     pad = width + 2
-    s = pygame.Surface((radius * 2 + pad * 2, radius * 2 + pad * 2), pygame.SRCALPHA)
+    cache_key = (radius, pad)
+    s = _ring_cache.get(cache_key)
+    if s is None:
+        s = pygame.Surface((radius * 2 + pad * 2, radius * 2 + pad * 2), pygame.SRCALPHA)
+        _ring_cache[cache_key] = s
+    s.fill((0, 0, 0, 0))
     pygame.draw.circle(
         s,
         (*color, max(0, min(255, alpha))),
@@ -78,7 +96,7 @@ def additive_ring(
 
 def radial_glow(
     surf: pygame.Surface,
-    center: Tuple[int, int],
+    center: tuple[int, int],
     radius: int,
     color: ColorRGB,
     alpha: int,
@@ -87,7 +105,12 @@ def radial_glow(
     """Concentric-circle radial gradient blitted additively. Cheap and pretty."""
     if radius <= 0 or alpha <= 0:
         return
-    glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+    cache_key = (radius, layers)
+    glow = _glow_cache.get(cache_key)
+    if glow is None:
+        glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+        _glow_cache[cache_key] = glow
+    glow.fill((0, 0, 0, 0))
     for i in range(layers, 0, -1):
         a = int(alpha * (i / layers) ** 2 * 0.35)
         r = int(radius * (i / layers))
@@ -110,7 +133,7 @@ def radial_glow(
 _scratch: pygame.Surface | None = None
 
 
-def _get_scratch(size: Tuple[int, int]) -> pygame.Surface:
+def _get_scratch(size: tuple[int, int]) -> pygame.Surface:
     global _scratch
     if _scratch is None or _scratch.get_size() != size:
         _scratch = pygame.Surface(size, pygame.SRCALPHA)
@@ -118,7 +141,7 @@ def _get_scratch(size: Tuple[int, int]) -> pygame.Surface:
 
 
 def _polyline_bbox(
-    points: Sequence[Tuple[float, float]], pad: int, bounds: Tuple[int, int]
+    points: Sequence[tuple[float, float]], pad: int, bounds: tuple[int, int]
 ) -> pygame.Rect | None:
     """Clipped integer bounding box of ``points`` (padded by ``pad`` px), or
     None if it falls entirely outside the surface."""
@@ -134,8 +157,8 @@ def _polyline_bbox(
 
 def _blit_polyline(
     surf: pygame.Surface,
-    points: Sequence[Tuple[float, float]],
-    rgba: Tuple[int, int, int, int],
+    points: Sequence[tuple[float, float]],
+    rgba: tuple[int, int, int, int],
     width: int,
     blend: int,
 ) -> None:
@@ -155,7 +178,7 @@ def _blit_polyline(
 
 def additive_polyline(
     surf: pygame.Surface,
-    points: Sequence[Tuple[float, float]],
+    points: Sequence[tuple[float, float]],
     color: ColorRGB,
     width: int,
     alpha: int,
@@ -173,7 +196,7 @@ def additive_polyline(
 
 def dark_polyline(
     surf: pygame.Surface,
-    points: Sequence[Tuple[float, float]],
+    points: Sequence[tuple[float, float]],
     color: ColorRGB,
     width: int,
     alpha: int,
@@ -186,12 +209,12 @@ def dark_polyline(
 
 
 def jagged_path(
-    start: Tuple[float, float],
-    end: Tuple[float, float],
+    start: tuple[float, float],
+    end: tuple[float, float],
     segment_len: float,
     jitter: float,
     rng: random.Random | None = None,
-) -> list[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """Return a list of points walking from `start` toward `end` in roughly
     `segment_len` steps with random perpendicular jitter. Used for
     lightning-style polylines."""
@@ -205,7 +228,7 @@ def jagged_path(
     ux, uy = dx / length, dy / length
     nx, ny = -uy, ux
 
-    pts: list[Tuple[float, float]] = []
+    pts: list[tuple[float, float]] = []
     for i in range(n + 1):
         t = i / n
         bx = sx + dx * t
@@ -218,13 +241,13 @@ def jagged_path(
 
 
 def jagged_branch(
-    origin: Tuple[float, float],
-    direction: Tuple[float, float],
+    origin: tuple[float, float],
+    direction: tuple[float, float],
     length: float,
     segment_len: float,
     jitter: float,
     rng: random.Random | None = None,
-) -> list[Tuple[float, float]]:
+) -> list[tuple[float, float]]:
     """A jagged path starting at `origin` heading along `direction` for
     `length` pixels. Direction is automatically normalised."""
     rng = rng or random
@@ -263,7 +286,7 @@ def ease_in_out_quad(t: float) -> float:
     return t * t * (3.0 - 2.0 * t) if t < 1.0 else 1.0
 
 
-def shake_offset(intensity: float, rng: random.Random | None = None) -> Tuple[int, int]:
+def shake_offset(intensity: float, rng: random.Random | None = None) -> tuple[int, int]:
     """Tiny screen-shake offset. Intensity in pixels."""
     rng = rng or random
     if intensity <= 0:

@@ -7,8 +7,9 @@ http://cristal.univ-lille.fr/~casiez/1euro/
 """
 
 from __future__ import annotations
+
 import math
-from typing import Optional
+
 import numpy as np
 
 
@@ -32,16 +33,16 @@ class OneEuroFilter:
         self.beta = beta
         self.dcutoff = dcutoff
         self.freq = freq
-        self._x_prev: Optional[np.ndarray] = None
-        self._dx_prev: Optional[np.ndarray] = None
-        self._t_prev: Optional[float] = None
+        self._x_prev: np.ndarray | None = None
+        self._dx_prev: np.ndarray | None = None
+        self._t_prev: float | None = None
 
     def reset(self) -> None:
         self._x_prev = None
         self._dx_prev = None
         self._t_prev = None
 
-    def __call__(self, x, t: Optional[float] = None):
+    def __call__(self, x, t: float | None = None):
         x = np.asarray(x, dtype=np.float32)
 
         if t is not None and self._t_prev is not None:

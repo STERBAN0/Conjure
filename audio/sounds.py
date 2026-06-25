@@ -1,0 +1,287 @@
+"""SoundManager — hook-driven ability SFX playback.
+
+Subscribes to the HookBus events emitted by gestures/router.py and plays
+per-ability sounds using pygame.mixer.  All playback is fire-and-forget; the
+class never raises into the event loop.
+
+Lifecycle:
+    ability_enter  → start looping the charge sound on a dedicated channel
+    ability_charge → once charge reaches 1.0, play the ready cue exactly once
+    ability_release→ play the cast sound, stop the charge loop
+    ability_exit   → stop the charge loop and reset per-activation state
+
+WAV files are loaded from ``config.SOUND_SFX_DIR`` at construction time.
+Missing files are silently skipped (prints a warning, continues).
+
+Graceful degradation mirrors audio/analyzer.py:
+  - If pygame.mixer is not initialised (no display server, headless CI, …)
+    the SoundManager sets ``_enabled = False`` and becomes a no-op.
+  - Every public method is wrapped with a try/except so a runtime glitch can
+    never propagate out through the HookBus.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+try:
+    import pygame  # type: ignore[import-untyped]
+    import pygame.mixer  # type: ignore[import-untyped]
+
+    _PYGAME_AVAILABLE = True
+except ImportError:
+    _PYGAME_AVAILABLE = False
+
+import config
+
+if TYPE_CHECKING:
+    from core.hooks import HookBus
+
+log = logging.getLogger(__name__)
+
+# Ability names that can have sound cues
+_ABILITY_NAMES: tuple[str, ...] = (
+    "fireball",
+    "rasengan",
+    "chidori",
+    "time_freeze",
+    "laser_eyes",
+    "kamehameha",
+    "space_stretch",
+    "reality_tear",
+    "frost_nova",
+)
+
+# Channel reserved for charge loops (always the last allocated channel)
+_CHARGE_CHANNEL_INDEX = config.SOUND_MIXER_CHANNELS - 1
+# Channel reserved for the chidori voice clip, so it can be stopped on exit
+# independently of the looping electric-crackle charge sound.
+_CHIDORI_VOICE_CHANNEL_INDEX = config.SOUND_MIXER_CHANNELS - 2
+
+# Abilities whose "charge" cue is a one-shot build (not a seamless loop) and that
+# culminate on their own — so we play it exactly once and suppress the separate
+# "ready" stinger. time_freeze uses the JoJo-style ticking-clock build that ends
+# in silence right as the screen freezes; laser_eyes uses a rising whine the same
+# length as LASER_EYES_CHARGE_SECONDS, so the sound finishing == "open your eyes".
+_PLAY_ONCE_CHARGE: frozenset[str] = frozenset({"time_freeze", "laser_eyes"})
+
+
+class SoundManager:
+    """Plays ability sound cues driven by HookBus events.
+
+    Parameters
+    ----------
+    hooks:
+        The application-wide HookBus instance.  Subscriptions are registered
+        during ``__init__``; no cleanup is needed on shutdown.
+    """
+
+    def __init__(self, hooks: HookBus) -> None:
+        self._enabled: bool = False
+        self._sounds: dict[str, pygame.mixer.Sound | None] = {}
+        self._charge_channel: pygame.mixer.Channel | None = None
+        # Dedicated channel for the chidori voice clip (the 8s "Chidori!" sound).
+        self._chidori_voice_channel: pygame.mixer.Channel | None = None
+        self._oneshots: dict[str, pygame.mixer.Sound | None] = {}
+
+        # Track per-activation ready-cue state keyed by ability name.
+        # Reset on ability_enter and ability_exit.
+        self._ready_played: dict[str, bool] = {}
+
+        if not getattr(config, "SOUND_ENABLED", True):
+            log.info("SoundManager: SOUND_ENABLED=False — sound disabled by config")
+            return
+
+        if not _PYGAME_AVAILABLE:
+            log.warning("SoundManager: pygame not available — running silent")
+            return
+
+        try:
+            if not pygame.mixer.get_init():
+                log.warning("SoundManager: mixer not initialised — running silent")
+                return
+            self._charge_channel = pygame.mixer.Channel(_CHARGE_CHANNEL_INDEX)
+            self._chidori_voice_channel = pygame.mixer.Channel(
+                _CHIDORI_VOICE_CHANNEL_INDEX
+            )
+            self._load_sounds()
+            self._enabled = True
+            log.info("SoundManager: initialised OK (%d cues loaded)", len(self._sounds))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("SoundManager: init error (%s) — running silent", exc)
+
+        hooks.on("ability_enter", self._on_enter)
+        hooks.on("ability_charge", self._on_charge)
+        hooks.on("ability_release", self._on_release)
+        hooks.on("ability_exit", self._on_exit)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _load_sounds(self) -> None:
+        """Load all WAV files from the SFX directory into pygame Sound objects."""
+        sfx_dir = Path(config.SOUND_SFX_DIR)
+        volume = float(getattr(config, "SOUND_MASTER_VOLUME", 0.8))
+
+        for ability in _ABILITY_NAMES:
+            for cue in ("charge", "ready", "cast"):
+                key = f"{ability}_{cue}"
+                wav_path = sfx_dir / f"{key}.wav"
+                sound = self._load_wav(wav_path, volume)
+                self._sounds[key] = sound  # None if missing — that's fine
+
+        # Load one-shot event cues. ``chidori_voice`` is the real 8s "Chidori!"
+        # clip (converted from chidori_sound.mp3); the looping electric crackle is
+        # the generated chidori_charge cue, which keeps playing after it ends.
+        for name in ("time_shatter", "chidori_voice"):
+            wav_path = sfx_dir / f"{name}.wav"
+            sound = self._load_wav(wav_path, volume)
+            self._oneshots[name] = sound
+
+    def _load_wav(self, path: Path, volume: float) -> pygame.mixer.Sound | None:
+        """Load a single WAV; return None (with warning) on failure."""
+        if not path.exists():
+            log.warning("SoundManager: WAV not found: %s", path)
+            return None
+        try:
+            snd = pygame.mixer.Sound(str(path))
+            snd.set_volume(volume)
+            return snd
+        except Exception as exc:  # noqa: BLE001
+            log.warning("SoundManager: failed to load %s: %s", path, exc)
+            return None
+
+    def _get(self, ability: str, cue: str) -> pygame.mixer.Sound | None:
+        return self._sounds.get(f"{ability}_{cue}")
+
+    def _play_oneshot(self, sound: pygame.mixer.Sound | None) -> None:
+        """Play a one-shot sound on any free channel."""
+        if sound is None:
+            return
+        try:
+            sound.play()
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager: play error: %s", exc)
+
+    def _start_charge_loop(self, ability: str) -> None:
+        """Start the charge sound on the dedicated charge channel.
+
+        Most abilities loop the charge cue seamlessly (-1); play-once abilities
+        (see _PLAY_ONCE_CHARGE) play their build a single time so it culminates
+        on its own rather than restarting.
+        """
+        if self._charge_channel is None:
+            return
+        sound = self._get(ability, "charge")
+        if sound is None:
+            return
+        loops = 0 if ability in _PLAY_ONCE_CHARGE else -1
+        try:
+            self._charge_channel.play(sound, loops=loops)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager: charge loop error: %s", exc)
+
+    def _stop_charge_loop(self) -> None:
+        """Stop the charge channel immediately."""
+        if self._charge_channel is None:
+            return
+        try:
+            self._charge_channel.stop()
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager: stop error: %s", exc)
+
+    def _start_chidori_voice(self) -> None:
+        """Play the 8s chidori voice clip once on its dedicated channel."""
+        if self._chidori_voice_channel is None:
+            return
+        sound = self._oneshots.get("chidori_voice")
+        if sound is None:
+            return
+        try:
+            self._chidori_voice_channel.play(sound, loops=0)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager: chidori voice error: %s", exc)
+
+    def _stop_chidori_voice(self) -> None:
+        """Stop the chidori voice clip (e.g. when the sign is dropped early)."""
+        if self._chidori_voice_channel is None:
+            return
+        try:
+            self._chidori_voice_channel.stop()
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager: chidori voice stop error: %s", exc)
+
+    # ------------------------------------------------------------------
+    # HookBus event handlers
+    # ------------------------------------------------------------------
+
+    def _on_enter(self, ability_name: str, frame: object, signals: object) -> None:
+        """ability_enter(ability_name, frame, signals)"""
+        if not self._enabled:
+            return
+        try:
+            self._ready_played[ability_name] = False
+            self._stop_charge_loop()
+            self._start_charge_loop(ability_name)
+            # Chidori: play the real 8s "Chidori!" clip once over the looping
+            # electric crackle (the charge cue). The crackle keeps going after the
+            # clip ends, so the lightning still sounds alive while the V is held.
+            if ability_name == "chidori":
+                self._start_chidori_voice()
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager._on_enter error: %s", exc)
+
+    def _on_charge(
+        self,
+        ability_name: str,
+        charge: float,
+        frame: object,
+        signals: object,
+    ) -> None:
+        """ability_charge(ability_name, charge, frame, signals)
+
+        Fire the ready cue exactly once when charge reaches 1.0.
+        """
+        if not self._enabled:
+            return
+        if not getattr(config, "SOUND_READY_CUE_ENABLED", True):
+            return
+        if ability_name in _PLAY_ONCE_CHARGE:
+            # The one-shot build is the cue; no separate ready stinger.
+            return
+        try:
+            if charge >= 1.0 and not self._ready_played.get(ability_name, False):
+                self._ready_played[ability_name] = True
+                self._play_oneshot(self._get(ability_name, "ready"))
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager._on_charge error: %s", exc)
+
+    def _on_release(self, ability_name: str, intensity: float, frame: object) -> None:
+        """ability_release(ability_name, intensity, frame)"""
+        if not self._enabled:
+            return
+        try:
+            self._stop_charge_loop()
+            self._play_oneshot(self._get(ability_name, "cast"))
+            self._ready_played.pop(ability_name, None)
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager._on_release error: %s", exc)
+
+    def _on_exit(self, ability_name: str) -> None:
+        """ability_exit(ability_name)"""
+        if not self._enabled:
+            return
+        try:
+            self._stop_charge_loop()
+            self._ready_played.pop(ability_name, None)
+            # Play glass shatter sound when time_freeze ends
+            if ability_name == "time_freeze":
+                self._play_oneshot(self._oneshots.get("time_shatter"))
+            # Cut the chidori voice clip when the sign is dropped.
+            if ability_name == "chidori":
+                self._stop_chidori_voice()
+        except Exception as exc:  # noqa: BLE001
+            log.debug("SoundManager._on_exit error: %s", exc)

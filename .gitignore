@@ -52,6 +52,10 @@ screenshots/
 *.log
 *.zip
 
+# ...but keep the generated hand-sign manual diagrams (referenced by docs/MANUAL.md)
+!docs/manual_images/
+!docs/manual_images/*.png
+
 # Models — bulky and fetched at install
 models/*.task
 models/*.tflite
@@ -59,3 +63,6 @@ models/*.tflite
 # OS junk
 .idea/
 *.bak
+
+# Local session notes — internal handoff, not part of the public repo
+HANDOFF.md

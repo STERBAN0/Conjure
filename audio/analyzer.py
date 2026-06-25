@@ -10,10 +10,15 @@ the system continues with zeroed audio signals.
 """
 
 from __future__ import annotations
+
+import logging
 import threading
+
 import numpy as np
 
 import config
+
+log = logging.getLogger(__name__)
 
 try:
     import sounddevice as sd
@@ -38,7 +43,7 @@ class AudioAnalyzer:
 
         if not config.AUDIO_ENABLED or not _SD_OK:
             if not _SD_OK:
-                print(f"[audio] disabled: sounddevice unavailable ({_SD_ERR})")
+                log.warning("audio disabled: sounddevice unavailable (%s)", _SD_ERR)
             return
 
         try:
@@ -52,14 +57,14 @@ class AudioAnalyzer:
             self._stream.start()
             self._enabled = True
         except Exception as e:
-            print(f"[audio] disabled: stream start failed ({e!r})")
+            log.warning("audio disabled: stream start failed (%r)", e)
             self._stream = None
 
     def _callback(self, indata, frames, time_info, status):
-        # `status` may report under/overflows; ignored on purpose to keep
-        # the audio path real-time. We just want the latest block.
+        # `status` may report under/overflows; log at debug level to avoid
+        # flooding the console while keeping the audio path real-time.
         if status:
-            pass
+            log.debug("audio stream status: %s", status)
         mono = indata[:, 0] if indata.ndim > 1 else indata
 
         # RMS with light perceptual curve.

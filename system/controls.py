@@ -4,7 +4,7 @@ Currently: master volume on Windows via pycaw. Engagement gating is
 strict on purpose — accidental volume changes are deeply annoying:
 
     A single open hand, palm centred-ish horizontally, motion energy
-    near zero, no Aether ability currently in flight, and the
+    near zero, no Conjure ability currently in flight, and the
     *other* hand absent (or also stationary) for a sustained moment.
 
 When engaged, hand vertical position maps to volume:
@@ -18,12 +18,11 @@ a dead-zone, which avoids spamming the audio service.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 
 import config
-from core.state import AbilityState, FrameState, GestureSignals, PHASE_IDLE
+from core.state import PHASE_IDLE, AbilityState, FrameState, GestureSignals
 from gestures.smoothing import EMA
 
 log = logging.getLogger(__name__)
@@ -43,8 +42,8 @@ class SystemControls:
     def __init__(self) -> None:
         self._volume_iface = None
         self._volume_ema = EMA(alpha=config.VOLUME_SMOOTH_ALPHA, init=0.5)
-        self._last_pushed: Optional[float] = None
-        self._engaged_since: Optional[float] = None
+        self._last_pushed: float | None = None
+        self._engaged_since: float | None = None
         self._engagement_grace = 0.4
         self.engaged: bool = False
         self.current_volume: float = 0.5
@@ -69,7 +68,7 @@ class SystemControls:
         self,
         frame: FrameState,
         signals: GestureSignals,
-        ability: Optional[AbilityState] = None,
+        ability: AbilityState | None = None,
     ) -> None:
         if self._volume_iface is None:
             return

@@ -6,8 +6,10 @@ dropping stale frames intentionally to minimise input latency.
 """
 
 from __future__ import annotations
+
 import threading
 import time
+
 import cv2
 import numpy as np
 

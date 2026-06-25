@@ -1,4 +1,4 @@
-"""Base class for all Aether effects.
+"""Base class for all Conjure effects.
 
 An effect is an object owned by the renderer. It has two roles:
 
@@ -15,8 +15,6 @@ those callbacks up at construction time.
 """
 
 from __future__ import annotations
-
-from typing import Optional
 
 import numpy as np
 import pygame

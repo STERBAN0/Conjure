@@ -49,7 +49,8 @@ def test_hookbus_off_removes_subscriber():
     # Arrange
     bus = HookBus()
     received = []
-    fn = lambda x: received.append(x)
+    def fn(x: object) -> None:
+        received.append(x)
     bus.on("evt", fn)
 
     # Act

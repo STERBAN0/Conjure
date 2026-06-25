@@ -1,12 +1,12 @@
 ---
 name: New ability proposal
-about: Propose a new anime-style ability for Aether
+about: Propose a new anime-style ability for Conjure
 labels: enhancement, ability
 ---
 
 ## Ability name
 
-<!-- E.g. "Lightning Dragon Roar", "Hadoken", "Force Push". -->
+<!-- E.g. "Lightning Dragon Roar", "Hadoken", "Shadow Clone". -->
 
 ## Source / reference
 
@@ -34,4 +34,4 @@ implement faithfully. -->
 
 ## Why it'd be cool
 
-<!-- Sell it. Aether prioritises iconic, recognisable abilities. -->
+<!-- Sell it. Conjure prioritises iconic, recognisable abilities. -->
