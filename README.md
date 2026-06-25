@@ -77,22 +77,41 @@ silenced, but everything visual works normally.
 
 ### End-user install
 
-#### Windows (PowerShell)
+#### Easiest: one command (any OS)
 
-```powershell
+Clone the repo, then run the bootstrap script. It creates the virtual
+environment, installs dependencies, downloads the models, and launches the
+app — the same command on Windows, macOS, and Linux:
+
+```bash
 git clone https://github.com/STERBAN0/conjure
 cd conjure
+python run.py
+```
+
+If `python` isn't found, try `py run.py` (Windows) or `python3 run.py`
+(macOS / Linux) — or just double-click `start.bat` (Windows) / run
+`sh start.sh` (macOS / Linux), which find your Python for you. Re-running
+`python run.py` later is fast: it reuses the environment and skips anything
+already done. Add `--setup-only` to prepare everything without launching, or
+`--reinstall` to force a fresh dependency install.
+
+#### Manual steps
+
+Prefer to run each step yourself? The script above is equivalent to:
+
+##### Windows (PowerShell)
+
+```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe scripts/download_model.py
 .\.venv\Scripts\python.exe main.py
 ```
 
-#### macOS / Linux
+##### macOS / Linux
 
 ```bash
-git clone https://github.com/STERBAN0/conjure
-cd conjure
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
