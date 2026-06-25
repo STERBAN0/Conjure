@@ -47,6 +47,13 @@ Issues = "https://github.com/STERBAN0/conjure/issues"
 [project.scripts]
 conjure = "main:main"
 
+# Flat layout: six package dirs plus two top-level modules at the repo root.
+# Declared explicitly because setuptools auto-discovery refuses to guess when
+# multiple top-level packages share the root.
+[tool.setuptools]
+py-modules = ["main", "config"]
+packages = ["audio", "core", "effects", "gestures", "system", "vision"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
