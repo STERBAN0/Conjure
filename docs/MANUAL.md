@@ -9,10 +9,10 @@ Hold a hand sign, charge it, then fire.
 | Key | Action |
 |-----|--------|
 | `Q` | Quit |
-| `ESC` | Close the manual when it's open (does **not** quit) |
+| `K` | Show / hide the on-screen controls list |
+| `ESC` | Close the manual / controls list when open (does **not** quit) |
 | `H` | Toggle minimal HUD |
 | `D` | Toggle debug overlay |
-| `L` | Toggle Laser Eyes / face tracking |
 | `R` | Clear the Laser Eyes molten drawing |
 | `S` | Save a screenshot to `./screenshots/` |
 | `M` | Open / close this manual (press `ESC` to close) |

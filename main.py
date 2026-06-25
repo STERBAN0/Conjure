@@ -17,11 +17,11 @@ Pipeline (per frame, ~60 Hz):
 
 Controls:
     Q         - quit
-    ESC       - close the manual (when open)
+    K         - show / hide the on-screen controls list
+    ESC       - close the manual / controls list (when open)
     H         - toggle minimal HUD
     D         - toggle debug overlay
     M         - toggle the hand-sign manual (←/→ to page)
-    L         - toggle Laser Eyes / face tracking
     R         - clear the laser-eyes molten "drawing" from the screen
     S         - save a screenshot to ./screenshots
 """
@@ -110,6 +110,7 @@ def main() -> int:
 
     show_hud_minimal = True
     show_hud_debug = False
+    show_controls = False
     last_t = time.monotonic()
     frame_count = 0
     last_face: FaceData | None = None
@@ -117,8 +118,8 @@ def main() -> int:
     face_enabled = face_tracker is not None
 
     log.info(
-        "Conjure started — Q quit, H HUD, D debug, M manual (ESC closes), "
-        "L laser eyes, R clear drawing, S screenshot"
+        "Conjure started — press K for the on-screen controls list "
+        "(Q quit, H HUD, D debug, M manual, R clear drawing, S screenshot)"
     )
     try:
         while True:
@@ -127,23 +128,22 @@ def main() -> int:
                     return 0
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
-                        # ESC closes the manual when open; it no longer quits.
+                        # ESC closes whatever overlay is open (manual first, then
+                        # the controls list); it never quits.
                         if manual.is_open:
                             manual.toggle()
+                        elif show_controls:
+                            show_controls = False
                     elif event.key == pygame.K_q:
                         return 0
+                    elif event.key == pygame.K_k:
+                        show_controls = not show_controls
                     elif event.key == pygame.K_h:
                         show_hud_minimal = not show_hud_minimal
                     elif event.key == pygame.K_d:
                         show_hud_debug = not show_hud_debug
                     elif event.key == pygame.K_m:
                         manual.toggle()
-                    elif event.key == pygame.K_l:
-                        face_enabled = not face_enabled
-                        log.info(
-                            "Laser Eyes / face tracking %s",
-                            "ON" if face_enabled else "OFF",
-                        )
                     elif event.key == pygame.K_r:
                         renderer.clear_drawings()
                         log.info("Cleared laser-eyes drawing")
@@ -216,6 +216,8 @@ def main() -> int:
                 )
             if manual.is_open:
                 manual.render(screen)
+            if show_controls:
+                hud.render_controls(screen)
 
             pygame.display.flip()
             clock.tick(config.TARGET_FPS)

@@ -122,6 +122,33 @@ _ROSTER_ENTRIES: list[tuple[str, str]] = [
     ("time_freeze", "Time Freeze"),
 ]
 
+# Canonical keyboard controls — the single source of truth for BOTH the on-screen
+# controls overlay (toggled with K) and the debug panel's compact legend, so the
+# two can never drift apart. Each entry is (key, short_label, description); the
+# debug legend uses the short label, the overlay uses the full description. Laser
+# Eyes is gesture-driven (no key), so it isn't listed here.
+_CONTROLS: tuple[tuple[str, str, str], ...] = (
+    ("K", "controls", "show / hide this controls list"),
+    ("H", "hud", "toggle the minimal HUD"),
+    ("D", "debug", "toggle the debug overlay"),
+    ("M", "manual", "open the hand-sign manual  (←/→ to page)"),
+    ("R", "clear", "clear the Laser Eyes drawing"),
+    ("S", "screenshot", "save a screenshot to ./screenshots"),
+    ("ESC", "close", "close the manual / this list"),
+    ("Q", "quit", "quit Conjure"),
+)
+
+
+def _controls_legend_lines() -> list[str]:
+    """Two compact lines for the debug panel, derived from `_CONTROLS`.
+
+    Split in half so the panel grows DOWN rather than WIDE (keeps each line
+    narrower than the long debug rows that govern the panel width).
+    """
+    parts = [f"{key} {short}" for key, short, _desc in _CONTROLS]
+    mid = (len(parts) + 1) // 2
+    return [" | ".join(parts[:mid]), " | ".join(parts[mid:])]
+
 
 class HUD:
     def __init__(self, width: int, height: int) -> None:
@@ -151,6 +178,9 @@ class HUD:
         # _debug_cache: last rendered debug panel + the key that produced it.
         self._debug_panel: pygame.Surface | None = None
         self._debug_panel_key: tuple | None = None
+
+        # _controls_panel: the K-overlay is static, so build it once on first use.
+        self._controls_panel: pygame.Surface | None = None
 
     # ------------------------------------------------------------------
     # Public API (keep existing signatures intact)
@@ -227,13 +257,10 @@ class HUD:
         if config.HUD_SHOW_ROSTER:
             self._draw_roster(target, matches_list, ability)
 
-        # Laser Eyes status indicator (top-left). The "L to toggle" hint tells the
-        # user which key turns the face/laser ability on and off.
-        laser_status = (
-            "LASER EYES: ON  ·  press L to toggle"
-            if face_enabled
-            else "LASER EYES: OFF  ·  press L to toggle"
-        )
+        # Laser Eyes status indicator (top-left): ON when face tracking is live,
+        # OFF when the face model is unavailable. It's a status read-out only — the
+        # ability itself is gesture-driven (eyes shut to charge, open to fire).
+        laser_status = "LASER EYES: ON" if face_enabled else "LASER EYES: OFF"
         laser_color = _TEXT_LASER_ON if face_enabled else _TEXT_LASER_OFF
         self._draw_text_with_outline(
             target, laser_status, self.font_small,
@@ -241,6 +268,68 @@ class HUD:
             color=laser_color,
             anchor="topleft",
         )
+
+        # Discoverability hint for the controls overlay (top-right) so the K key
+        # isn't invisible. Black fill + the bright halo from _draw_text_with_outline
+        # keeps it readable on bright, dark, or busy backgrounds alike.
+        self._draw_text_with_outline(
+            target, "PRESS K FOR CONTROLS", self.font_small,
+            position=(self.width - 10, 10),
+            color=(8, 10, 16),
+            anchor="topright",
+        )
+
+    # ------------------------------------------------------------------
+
+    def render_controls(self, target: pygame.Surface) -> None:
+        """Centred overlay listing every keyboard command (toggled with K).
+
+        The panel is static, so it's composited once and cached — subsequent
+        frames pay only a single blit.
+        """
+        if self._controls_panel is None:
+            self._controls_panel = self._build_controls_panel()
+        panel = self._controls_panel
+        rect = panel.get_rect(center=(self.width // 2, self.height // 2))
+        target.blit(panel, rect)
+
+    def _build_controls_panel(self) -> pygame.Surface:
+        """Compose the controls overlay surface from the canonical _CONTROLS list."""
+        title_color = (236, 243, 255)
+        key_color = (140, 220, 255)
+        desc_color = (208, 220, 238)
+
+        title = self.font_med.render("CONTROLS", True, title_color)
+        rows = [
+            (
+                self.font_med.render(key, True, key_color),
+                self.font_small.render(desc, True, desc_color),
+            )
+            for key, _short, desc in _CONTROLS
+        ]
+
+        pad = 22
+        row_pitch = 30
+        gap = 16  # space between the key column and the description column
+        key_col_w = max(k.get_width() for k, _ in rows) + gap
+        desc_col_w = max(d.get_width() for _, d in rows)
+        content_w = max(title.get_width(), key_col_w + desc_col_w)
+        panel_w = content_w + pad * 2
+        panel_h = pad * 2 + title.get_height() + 16 + row_pitch * len(rows)
+
+        panel = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        panel.fill((8, 12, 22, 226))
+        pygame.draw.rect(panel, (92, 132, 182), panel.get_rect(), width=1)
+
+        panel.blit(title, ((panel_w - title.get_width()) // 2, pad))
+        y = pad + title.get_height() + 16
+        for key_surf, desc_surf in rows:
+            panel.blit(key_surf, (pad, y))
+            # Vertically centre the description against the (taller) key glyph.
+            desc_y = y + (key_surf.get_height() - desc_surf.get_height()) // 2
+            panel.blit(desc_surf, (pad + key_col_w, desc_y))
+            y += row_pitch
+        return panel
 
     # ------------------------------------------------------------------
 
@@ -266,7 +355,7 @@ class HUD:
                 f"gaze=({float(face.gaze[0]):+.2f},{float(face.gaze[1]):+.2f})"
             )
         else:
-            face_line = "face         : (not tracked — press L for Laser Eyes)"
+            face_line = "face         : (not tracked)"
         lines = [
             f"fps          : {self._fps_smoothed:5.1f}",
             f"hands        : {hand_labels}",
@@ -287,12 +376,9 @@ class HUD:
         for m in sorted(matches, key=lambda x: -x.confidence):
             lines.append(f"  {m.name:<14} {m.confidence:.2f}")
         lines.append("")
-        # Controls split across TWO lines, keys separated by " | ", so the panel
-        # grows DOWN instead of WIDE — each half stays narrower than the "face :"
-        # row (the longest line), which is what now governs the panel width. "S
-        # screenshot" is spelled out (the old "S shot" read ambiguously).
-        lines.append("Q quit | ESC exit manual | H hud | D debug")
-        lines.append("L laser | R clear | M manual | S screenshot")
+        # Controls legend, derived from the canonical _CONTROLS list so it stays
+        # in lockstep with the K overlay. Two lines keep the panel narrow.
+        lines.extend(_controls_legend_lines())
 
         # Cache the debug panel by its content so the ~20 font renders + surface
         # alloc only happen when the text actually changes (typically once per
