@@ -22,6 +22,7 @@ Controls:
     H         - toggle minimal HUD
     D         - toggle debug overlay
     M         - toggle the hand-sign manual (←/→ to page)
+    L         - toggle Laser Eyes (face tracking) on / off
     R         - clear the laser-eyes molten "drawing" from the screen
     S         - save a screenshot to ./screenshots
 """
@@ -119,7 +120,7 @@ def main() -> int:
 
     log.info(
         "Conjure started — press K for the on-screen controls list "
-        "(Q quit, H HUD, D debug, M manual, R clear drawing, S screenshot)"
+        "(Q quit, H HUD, D debug, M manual, L laser eyes, R clear drawing, S screenshot)"
     )
     try:
         while True:
@@ -144,6 +145,14 @@ def main() -> int:
                         show_hud_debug = not show_hud_debug
                     elif event.key == pygame.K_m:
                         manual.toggle()
+                    elif event.key == pygame.K_l:
+                        # Toggle Laser Eyes / face tracking; the top-left
+                        # LASER EYES: ON/OFF read-out reflects this next frame.
+                        face_enabled = not face_enabled
+                        log.info(
+                            "Laser Eyes / face tracking %s",
+                            "ON" if face_enabled else "OFF",
+                        )
                     elif event.key == pygame.K_r:
                         renderer.clear_drawings()
                         log.info("Cleared laser-eyes drawing")

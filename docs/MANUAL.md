@@ -13,6 +13,7 @@ Hold a hand sign, charge it, then fire.
 | `ESC` | Close the manual / controls list when open (does **not** quit) |
 | `H` | Toggle minimal HUD |
 | `D` | Toggle debug overlay |
+| `L` | Toggle Laser Eyes / face tracking on/off |
 | `R` | Clear the Laser Eyes molten drawing |
 | `S` | Save a screenshot to `./screenshots/` |
 | `M` | Open / close this manual (press `ESC` to close) |
@@ -88,7 +89,7 @@ Hold a hand sign, charge it, then fire.
 |---|---|
 | **Sign** | Close BOTH eyes — face sign, no hands needed (quick blinks don't count) |
 | **Charge** | Hold both eyes shut ~1 s; the rising whine builds — when it ends, your eyes are charged |
-| **Fire** | OPEN EYES TO FIRE — twin beams CONVERGE to a single point you aim with your HEAD and EYES together. It starts on your own face and reaches anywhere on screen (no dead zone), melting a trail you can draw/write with — a smiley or "HI". Close your eyes again (~0.25 s) to stop. The drawing stays until you press `R`. `L` toggles face tracking on/off |
+| **Fire** | OPEN EYES TO FIRE — twin beams CONVERGE to a single point you aim with your HEAD and EYES together. It starts on your own face and reaches anywhere on screen (no dead zone), melting a trail you can draw/write with — a smiley or "HI". Close your eyes again (~0.25 s) to stop. The drawing stays until you press `R` |
 
 ---
 

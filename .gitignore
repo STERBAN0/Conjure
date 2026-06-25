@@ -66,3 +66,4 @@ models/*.tflite
 
 # Local session notes — internal handoff, not part of the public repo
 HANDOFF.md
+DEMO_SCRIPT.md

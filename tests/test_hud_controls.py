@@ -1,8 +1,8 @@
 """Tests for the on-screen controls list (the K overlay) and its debug legend.
 
 The K overlay and the debug-panel legend both render from one canonical list,
-``_CONTROLS``. These tests guard against (a) the removed Laser Eyes key toggle
-creeping back in and (b) the overlay and the legend drifting out of sync.
+``_CONTROLS``, so these tests guard against the two drifting out of sync and
+against documented keys (like the L laser toggle) going missing.
 """
 from __future__ import annotations
 
@@ -16,10 +16,10 @@ def test_controls_list_includes_the_overlay_key() -> None:
     assert "K" in keys  # the key that opens this very list
 
 
-def test_controls_list_has_no_laser_eyes_toggle() -> None:
-    # Laser Eyes is gesture-driven now; the old "L to toggle" must not return.
+def test_controls_list_includes_laser_toggle() -> None:
+    # L toggles Laser Eyes / face tracking; it must be documented in the list.
     keys = {key for key, _short, _desc in _CONTROLS}
-    assert "L" not in keys
+    assert "L" in keys
 
 
 def test_controls_keys_are_unique() -> None:

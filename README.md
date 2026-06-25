@@ -141,12 +141,14 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor setup.
 | `H` | Toggle the minimal HUD (ability label, charge, cooldown) |
 | `D` | Toggle the debug overlay (signals + poses + face mask) |
 | `M` | Toggle the in-app hand-sign manual (←/→ to page) |
+| `L` | Toggle Laser Eyes / face tracking on/off |
 | `R` | Clear the Laser Eyes molten "drawing" from the screen |
 | `S` | Save a screenshot to `./screenshots/` |
 
-Laser Eyes has no key — it's gesture-driven (shut your eyes to charge, open to
-fire). The top-left `LASER EYES: ON/OFF` read-out shows whether face tracking is
-live (`OFF` means the face model isn't available — run `download_model.py`).
+Laser Eyes itself is gesture-driven (shut your eyes to charge, open to fire); `L`
+turns its face tracking on/off, and the top-left `LASER EYES: ON/OFF` read-out
+reflects that state. `OFF` also appears when the face model isn't available — run
+`download_model.py`.
 
 ## How it feels
 

@@ -125,13 +125,13 @@ _ROSTER_ENTRIES: list[tuple[str, str]] = [
 # Canonical keyboard controls — the single source of truth for BOTH the on-screen
 # controls overlay (toggled with K) and the debug panel's compact legend, so the
 # two can never drift apart. Each entry is (key, short_label, description); the
-# debug legend uses the short label, the overlay uses the full description. Laser
-# Eyes is gesture-driven (no key), so it isn't listed here.
+# debug legend uses the short label, the overlay uses the full description.
 _CONTROLS: tuple[tuple[str, str, str], ...] = (
     ("K", "controls", "show / hide this controls list"),
     ("H", "hud", "toggle the minimal HUD"),
     ("D", "debug", "toggle the debug overlay"),
     ("M", "manual", "open the hand-sign manual  (←/→ to page)"),
+    ("L", "laser", "toggle Laser Eyes on / off"),
     ("R", "clear", "clear the Laser Eyes drawing"),
     ("S", "screenshot", "save a screenshot to ./screenshots"),
     ("ESC", "close", "close the manual / this list"),
