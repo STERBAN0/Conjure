@@ -302,6 +302,32 @@ class TestGracefulDegradation:
 # Tests: time_shatter event cue
 # ---------------------------------------------------------------------------
 
+class TestSfxDirResolution:
+    """Regression: the SFX directory must resolve relative to the repo, not cwd.
+
+    Launching from any directory other than the repo root (an editable /
+    console-script install, an IDE "Run" button) used to make every WAV fail to
+    load, so the app ran with no sound at all. ``_resolve_sfx_dir`` anchors the
+    configured relative path to the package root so audio works from anywhere.
+    """
+
+    def test_relative_dir_is_cwd_independent(self, tmp_path, monkeypatch):
+        from audio.sounds import _resolve_sfx_dir
+
+        monkeypatch.chdir(tmp_path)  # cwd is deliberately NOT the repo root
+        resolved = _resolve_sfx_dir("audio/sfx")
+
+        assert resolved.is_absolute()
+        assert resolved.is_dir(), f"resolved SFX dir should exist: {resolved}"
+        # The committed cues are found regardless of where we launched from.
+        assert (resolved / "chidori_charge.wav").exists()
+
+    def test_absolute_dir_is_returned_unchanged(self, tmp_path):
+        from audio.sounds import _resolve_sfx_dir
+
+        assert _resolve_sfx_dir(str(tmp_path)) == tmp_path
+
+
 class TestTimeShatter:
     def test_time_shatter_plays_on_time_freeze_exit(self, sound_manager):
         sm, hooks, channel = sound_manager

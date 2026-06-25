@@ -68,6 +68,26 @@ _CHIDORI_VOICE_CHANNEL_INDEX = config.SOUND_MIXER_CHANNELS - 2
 _PLAY_ONCE_CHARGE: frozenset[str] = frozenset({"time_freeze", "laser_eyes"})
 
 
+def _resolve_sfx_dir(sfx_dir: str) -> Path:
+    """Resolve the configured SFX directory to an absolute path.
+
+    ``config.SOUND_SFX_DIR`` is a repo-relative path ("audio/sfx"). Resolving it
+    against the *current working directory* silently breaks whenever the app is
+    launched from anywhere other than the repo root — an editable/console-script
+    install (``conjure`` run from the home folder), an IDE "Run" button, etc.:
+    every WAV then fails to load and the app runs with no sound at all.
+
+    Anchor it to the package root instead — the same ``__file__``-based approach
+    ``vision/hand_tracker.py`` uses to locate the model files — so audio works
+    regardless of the working directory. Absolute overrides are honoured as-is.
+    """
+    path = Path(sfx_dir)
+    if path.is_absolute():
+        return path
+    # this file is <repo_root>/audio/sounds.py → parents[1] is <repo_root>
+    return Path(__file__).resolve().parents[1] / path
+
+
 class SoundManager:
     """Plays ability sound cues driven by HookBus events.
 
@@ -123,7 +143,7 @@ class SoundManager:
 
     def _load_sounds(self) -> None:
         """Load all WAV files from the SFX directory into pygame Sound objects."""
-        sfx_dir = Path(config.SOUND_SFX_DIR)
+        sfx_dir = _resolve_sfx_dir(config.SOUND_SFX_DIR)
         volume = float(getattr(config, "SOUND_MASTER_VOLUME", 0.8))
 
         for ability in _ABILITY_NAMES:
@@ -140,6 +160,15 @@ class SoundManager:
             wav_path = sfx_dir / f"{name}.wav"
             sound = self._load_wav(wav_path, volume)
             self._oneshots[name] = sound
+
+        # If nothing loaded, the app would run completely silent — surface why and
+        # where we looked, rather than leaving the user guessing.
+        if not any(self._sounds.values()) and not any(self._oneshots.values()):
+            log.warning(
+                "SoundManager: no SFX loaded from %s — the app will run silent. "
+                "Expected the committed audio/sfx/*.wav files there.",
+                sfx_dir,
+            )
 
     def _load_wav(self, path: Path, volume: float) -> pygame.mixer.Sound | None:
         """Load a single WAV; return None (with warning) on failure."""

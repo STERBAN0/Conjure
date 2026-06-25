@@ -86,11 +86,22 @@ def main() -> int:
     # Failure is non-fatal: SoundManager degrades gracefully if the mixer is
     # not initialised (headless environments, missing audio drivers, etc.).
     try:
-        pygame.mixer.init(
-            frequency=config.SOUND_MIXER_FREQUENCY,
-            size=-16,
-            channels=2,
-        )
+        try:
+            pygame.mixer.init(
+                frequency=config.SOUND_MIXER_FREQUENCY,
+                size=-16,
+                channels=2,
+            )
+        except Exception as _param_exc:  # noqa: BLE001
+            # Some audio devices reject the forced 44.1 kHz / 16-bit format. Let
+            # SDL pick the device-native settings before giving up on sound.
+            log.warning(
+                "pygame.mixer init at %d Hz failed (%s) — retrying with device "
+                "defaults",
+                config.SOUND_MIXER_FREQUENCY,
+                _param_exc,
+            )
+            pygame.mixer.init()
         pygame.mixer.set_num_channels(config.SOUND_MIXER_CHANNELS)
     except Exception as _mixer_exc:  # noqa: BLE001
         log.warning("pygame.mixer init failed (%s) — SFX disabled", _mixer_exc)
