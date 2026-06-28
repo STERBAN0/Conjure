@@ -97,6 +97,12 @@ def _clamp01(value: float) -> float:
     return value
 
 
+def _ability_gain(ability_name: str) -> float:
+    """Per-ability baseline gain from config (1.0 when unconfigured)."""
+    gains = getattr(config, "SOUND_ABILITY_GAIN", {})
+    return float(gains.get(ability_name, 1.0))
+
+
 class SoundManager:
     """Plays ability sound cues driven by HookBus events.
 
@@ -123,6 +129,9 @@ class SoundManager:
             float(getattr(config, "SOUND_MASTER_VOLUME", 0.8))
         )
         self._muted: bool = False
+        # Per-sound baseline gain, keyed exactly like _sounds / _oneshots, so the
+        # applied volume is master × gain. Populated by _load_sounds.
+        self._gains: dict[str, float] = {}
 
         # Track per-activation ready-cue state keyed by ability name.
         # Reset on ability_enter and ability_exit.
@@ -188,13 +197,16 @@ class SoundManager:
         return 0.0 if self._muted else self._master_volume
 
     def _apply_volume(self) -> None:
-        """Push the effective volume onto every loaded Sound. Safe if empty."""
-        vol = self._effective_volume()
-        for snd in (*self._sounds.values(), *self._oneshots.values()):
+        """Push each Sound's effective volume (master × per-ability gain).
+
+        Safe to call with no loaded sounds — it simply iterates nothing.
+        """
+        master = self._effective_volume()
+        for key, snd in (*self._sounds.items(), *self._oneshots.items()):
             if snd is None:
                 continue
             try:
-                snd.set_volume(vol)
+                snd.set_volume(_clamp01(master * self._gains.get(key, 1.0)))
             except Exception as exc:  # noqa: BLE001
                 log.debug("SoundManager: set_volume failed: %s", exc)
 
@@ -203,24 +215,34 @@ class SoundManager:
     # ------------------------------------------------------------------
 
     def _load_sounds(self) -> None:
-        """Load all WAV files from the SFX directory into pygame Sound objects."""
+        """Load all WAV files from the SFX directory into pygame Sound objects.
+
+        Each sound's initial volume is the effective master scaled by its
+        ability's baseline gain (config.SOUND_ABILITY_GAIN); the gain is recorded
+        in ``_gains`` so _apply_volume can re-scale live when the slider moves.
+        """
         sfx_dir = _resolve_sfx_dir(config.SOUND_SFX_DIR)
-        volume = self._effective_volume()
+        master = self._effective_volume()
 
         for ability in _ABILITY_NAMES:
+            gain = _ability_gain(ability)
             for cue in ("charge", "ready", "cast"):
                 key = f"{ability}_{cue}"
                 wav_path = sfx_dir / f"{key}.wav"
-                sound = self._load_wav(wav_path, volume)
-                self._sounds[key] = sound  # None if missing — that's fine
+                self._gains[key] = gain
+                # None if missing — that's fine
+                self._sounds[key] = self._load_wav(wav_path, _clamp01(master * gain))
 
-        # Load one-shot event cues. ``chidori_voice`` is the real 8s "Chidori!"
-        # clip (converted from chidori_sound.mp3); the looping electric crackle is
-        # the generated chidori_charge cue, which keeps playing after it ends.
-        for name in ("time_shatter", "chidori_voice"):
+        # Load one-shot event cues, each tied to its parent ability's gain.
+        # ``chidori_voice`` is the real 8s "Chidori!" clip (converted from
+        # chidori_sound.mp3); the looping electric crackle is the generated
+        # chidori_charge cue, which keeps playing after it ends.
+        oneshot_ability = {"time_shatter": "time_freeze", "chidori_voice": "chidori"}
+        for name, ability in oneshot_ability.items():
+            gain = _ability_gain(ability)
             wav_path = sfx_dir / f"{name}.wav"
-            sound = self._load_wav(wav_path, volume)
-            self._oneshots[name] = sound
+            self._gains[name] = gain
+            self._oneshots[name] = self._load_wav(wav_path, _clamp01(master * gain))
 
         # If nothing loaded, the app would run completely silent — surface why and
         # where we looked, rather than leaving the user guessing.

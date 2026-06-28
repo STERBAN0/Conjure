@@ -373,33 +373,46 @@ class TestVolumeAndMute:
         assert sm.master_volume == pytest.approx(config.SOUND_MASTER_VOLUME)
         assert sm.is_muted is False
 
-    def test_set_master_volume_clamps_and_applies_live(self, sound_manager):
+    def test_per_ability_gain_scales_applied_volume(self, sound_manager):
+        """At full master, each Sound is set to master × its ability gain.
+
+        The mocked mixer hands back a single shared Sound mock, so every key's
+        set_volume lands on the same object — we assert the *set* of applied
+        levels contains the per-ability values rather than the last one.
+        """
+        import config
         sm, _hooks, _channel = sound_manager
-        any_sound = sm._get("rasengan", "charge")
+        shared = sm._get("fireball", "charge")
+        shared.set_volume.reset_mock()
 
-        sm.set_master_volume(0.3)
-        assert sm.master_volume == pytest.approx(0.3)
-        # The new level is pushed onto the loaded Sounds immediately.
-        any_sound.set_volume.assert_called_with(0.3)
+        sm.set_master_volume(1.0)
+        applied = {round(c.args[0], 4) for c in shared.set_volume.call_args_list}
+        assert round(config.SOUND_ABILITY_GAIN["fireball"], 4) in applied   # 0.7
+        assert round(config.SOUND_ABILITY_GAIN["laser_eyes"], 4) in applied  # 0.4
 
+    def test_set_master_volume_clamps(self, sound_manager):
+        sm, _hooks, _channel = sound_manager
         sm.set_master_volume(5.0)    # above range → clamped to 1.0
         assert sm.master_volume == 1.0
         sm.set_master_volume(-2.0)   # below range → clamped to 0.0
         assert sm.master_volume == 0.0
 
-    def test_mute_applies_zero_but_preserves_level(self, sound_manager):
+    def test_mute_silences_all_then_restores(self, sound_manager):
         sm, _hooks, _channel = sound_manager
-        any_sound = sm._get("rasengan", "charge")
-        sm.set_master_volume(0.6)
+        shared = sm._get("fireball", "charge")
+        sm.set_master_volume(1.0)
 
+        shared.set_volume.reset_mock()
         sm.set_muted(True)
         assert sm.is_muted is True
-        assert sm.master_volume == pytest.approx(0.6)   # level remembered
-        any_sound.set_volume.assert_called_with(0.0)    # but silenced live
+        assert sm.master_volume == pytest.approx(1.0)   # level remembered
+        # every applied volume is 0 while muted
+        assert all(c.args[0] == 0.0 for c in shared.set_volume.call_args_list)
 
+        shared.set_volume.reset_mock()
         sm.set_muted(False)
-        assert sm.is_muted is False
-        any_sound.set_volume.assert_called_with(0.6)    # restored exactly
+        # restored to non-zero per-ability levels
+        assert any(c.args[0] > 0.0 for c in shared.set_volume.call_args_list)
 
     def test_toggle_muted_returns_new_state(self, sound_manager):
         sm, _hooks, _channel = sound_manager

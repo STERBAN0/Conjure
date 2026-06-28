@@ -270,12 +270,19 @@ class HUD:
             anchor="topleft",
         )
 
-        # Discoverability hint for the controls overlay (top-right) so the K key
-        # isn't invisible. Black fill + the bright halo from _draw_text_with_outline
-        # keeps it readable on bright, dark, or busy backgrounds alike.
+        # Discoverability hints for the overlays (top-right) so the K/O keys
+        # aren't invisible. Black fill + the bright halo from _draw_text_with_outline
+        # keeps them readable on bright, dark, or busy backgrounds alike. The
+        # audio-options hint sits directly under the controls hint, same colour.
         self._draw_text_with_outline(
             target, "PRESS K FOR CONTROLS", self.font_small,
             position=(self.width - 10, 10),
+            color=(8, 10, 16),
+            anchor="topright",
+        )
+        self._draw_text_with_outline(
+            target, "PRESS O FOR AUDIO OPTIONS", self.font_small,
+            position=(self.width - 10, 10 + self.font_small.get_height() + 2),
             color=(8, 10, 16),
             anchor="topright",
         )

@@ -26,23 +26,32 @@ if TYPE_CHECKING:
     from audio.sounds import SoundManager
 
 # Panel geometry (logical pixels — pygame's SCALED mode maps mouse events back
-# into this same logical space, so hit-testing matches what's drawn).
-_PANEL_W = 420
-_PANEL_H = 210
-_PAD = 30
+# into this same logical space, so hit-testing matches what's drawn). The panel
+# is wide enough for the footer hint to sit comfortably on one line.
+_PANEL_W = 560
+_PANEL_H = 220
+_PAD = 34
+
+# Panel-local y offsets, shared by both render() and the screen-space hit rects
+# built in __init__ so the drawing and the click targets can never drift apart.
+_TITLE_Y = 26
+_CHECKBOX_Y = 84
+_SLIDER_Y = 152
+_FOOTER_FROM_BOTTOM = 30
+
 _CHECKBOX_SIZE = 26
-_SLIDER_W = 250
+_SLIDER_W = 380
 _SLIDER_H = 6
 _KNOB_R = 9
 
-# Colours, matched to effects/hud.py's controls overlay.
+# Colours, matched to effects/hud.py's controls overlay (square 1px border).
 _BG = (8, 12, 22, 232)
 _BORDER = (92, 132, 182)
 _TITLE_C = (236, 243, 255)
 _TEXT_C = (208, 220, 238)
 _DIM_C = (120, 135, 155)
 _ACCENT = (140, 220, 255)
-_HINT_C = (100, 120, 150)
+_HINT_C = (120, 140, 170)
 
 
 def volume_from_mouse_x(mouse_x: int, track_left: int, track_width: int) -> float:
@@ -83,14 +92,14 @@ class OptionsPanel:
 
         # Checkbox box + a generous click target spanning its label.
         box_x = px + _PAD
-        box_y = py + 78
+        box_y = py + _CHECKBOX_Y
         self._checkbox_box = pygame.Rect(box_x, box_y, _CHECKBOX_SIZE, _CHECKBOX_SIZE)
-        self._checkbox_hit = pygame.Rect(box_x - 6, box_y - 8, 260, _CHECKBOX_SIZE + 16)
+        self._checkbox_hit = pygame.Rect(box_x - 6, box_y - 8, 300, _CHECKBOX_SIZE + 16)
 
         # Slider track + a taller grab area so the knob is easy to catch.
         self._slider_left = px + _PAD
         self._slider_width = _SLIDER_W
-        self._slider_y = py + 148
+        self._slider_y = py + _SLIDER_Y
         self._slider_hit = pygame.Rect(
             self._slider_left - _KNOB_R,
             self._slider_y - 14,
@@ -151,67 +160,66 @@ class OptionsPanel:
 
         panel = pygame.Surface((_PANEL_W, _PANEL_H), pygame.SRCALPHA)
         panel.fill(_BG)
-        pygame.draw.rect(panel, _BORDER, panel.get_rect(), width=1, border_radius=10)
+        # Square 1px border to match the dark fill's corners and the K controls
+        # overlay — no border_radius (which left the fill's corners poking out).
+        pygame.draw.rect(panel, _BORDER, panel.get_rect(), width=1)
 
         # Title.
         title = self._font_title.render("AUDIO OPTIONS", True, _TITLE_C)
-        panel.blit(title, ((_PANEL_W - title.get_width()) // 2, _PAD - 6))
+        panel.blit(title, ((_PANEL_W - title.get_width()) // 2, _TITLE_Y))
 
         muted = self._sound.is_muted
 
-        # --- mute checkbox (panel-local coords) ---
-        box = pygame.Rect(_PAD, 78, _CHECKBOX_SIZE, _CHECKBOX_SIZE)
-        pygame.draw.rect(panel, _ACCENT, box, width=2, border_radius=5)
+        # --- mute checkbox (panel-local coords, square to match the panel) ---
+        box = pygame.Rect(_PAD, _CHECKBOX_Y, _CHECKBOX_SIZE, _CHECKBOX_SIZE)
+        pygame.draw.rect(panel, _ACCENT, box, width=2)
         if muted:
-            # Filled box + a tick to read clearly as "checked / muted".
-            inner = box.inflate(-8, -8)
-            pygame.draw.rect(panel, _ACCENT, inner, border_radius=3)
+            # Filled box + a tick so it clearly reads as "checked / muted".
+            pygame.draw.rect(panel, _ACCENT, box.inflate(-8, -8))
             pygame.draw.lines(
                 panel, (8, 12, 22), False,
                 [(box.left + 6, box.centery),
-                 (box.centerx - 1, box.bottom - 8),
+                 (box.centerx - 1, box.bottom - 7),
                  (box.right - 5, box.top + 7)],
                 3,
             )
         label = self._font_row.render("Mute audio", True, _TEXT_C)
-        panel.blit(label, (box.right + 14, box.centery - label.get_height() // 2))
+        panel.blit(label, (box.right + 16, box.centery - label.get_height() // 2))
 
         # --- volume slider (only when not muted) ---
-        track_y = 151
-        track_local_left = _PAD
+        track_cy = _SLIDER_Y + _SLIDER_H // 2
         if muted:
             note = self._font_row.render("(sound effects muted)", True, _DIM_C)
-            panel.blit(note, (_PAD, track_y - 8))
+            panel.blit(note, (_PAD, _SLIDER_Y - 8))
         else:
             vol = self._sound.master_volume
-            # Track.
-            track = pygame.Rect(track_local_left, track_y, _SLIDER_W, _SLIDER_H)
+            track = pygame.Rect(_PAD, _SLIDER_Y, _SLIDER_W, _SLIDER_H)
             pygame.draw.rect(panel, (255, 255, 255, 40), track, border_radius=3)
-            # Fill up to the knob.
             fill_w = int(_SLIDER_W * vol)
             if fill_w > 0:
                 pygame.draw.rect(
                     panel, _ACCENT,
-                    pygame.Rect(track_local_left, track_y, fill_w, _SLIDER_H),
+                    pygame.Rect(_PAD, _SLIDER_Y, fill_w, _SLIDER_H),
                     border_radius=3,
                 )
-            # Knob.
-            knob_x = track_local_left + fill_w
-            pygame.draw.circle(panel, (240, 250, 255), (knob_x, track_y + _SLIDER_H // 2), _KNOB_R)
-            pygame.draw.circle(panel, _BORDER, (knob_x, track_y + _SLIDER_H // 2), _KNOB_R, 1)
-            # Percentage readout to the right of the track.
+            knob_x = _PAD + fill_w
+            pygame.draw.circle(panel, (240, 250, 255), (knob_x, track_cy), _KNOB_R)
+            pygame.draw.circle(panel, _BORDER, (knob_x, track_cy), _KNOB_R, 1)
             pct = self._font_row.render(f"{int(round(vol * 100))}%", True, _TEXT_C)
             panel.blit(
                 pct,
-                (track_local_left + _SLIDER_W + 18, track_y + _SLIDER_H // 2 - pct.get_height() // 2),
+                (_PAD + _SLIDER_W + 22, track_cy - pct.get_height() // 2),
             )
 
-        # Footer hint.
+        # Footer hint, centred (panel is wide enough for it on one line).
         hint = self._font_hint.render(
             "click the box to mute  ·  drag the slider  ·  O / ESC to close",
             True, _HINT_C,
         )
-        panel.blit(hint, ((_PANEL_W - hint.get_width()) // 2, _PANEL_H - 28))
+        panel.blit(
+            hint,
+            ((_PANEL_W - hint.get_width()) // 2, _PANEL_H - _FOOTER_FROM_BOTTOM),
+        )
 
         target.blit(panel, self._panel_rect.topleft)
 

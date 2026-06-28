@@ -295,9 +295,9 @@ THUMB_OPEN_RATIO_EXTENDED: float = 1.22  # ≥ this => fully extended (1.0)
 POSE_ENTER_THRESHOLD: float = 0.55    # confidence to BEGIN a pose
 POSE_EXIT_THRESHOLD: float = 0.35     # confidence to KEEP a held pose
 # Consecutive frames above enter-threshold before a pose activates and starts
-# charging. At TARGET_FPS=60 this is the deliberate-hold window: 15 ≈ 0.25 s, so
+# charging. At TARGET_FPS=60 this is the deliberate-hold window: 9 ≈ 0.15 s, so
 # a relaxed or transient hand shape no longer trips an ability instantly.
-POSE_ENTER_FRAMES: int = 15           # ~0.25 s @ 60 FPS
+POSE_ENTER_FRAMES: int = 9            # ~0.15 s @ 60 FPS
 
 # Hand-count debounce. MediaPipe occasionally emits a phantom second hand (or
 # drops one) for a frame or two; on real footage the hand count flickered on
@@ -652,6 +652,21 @@ HAND_FLICK_DECAY_SECONDS: float = 0.40     # how long a captured flick stays val
 # and plays charge / ready / cast cues per ability.
 SOUND_ENABLED: bool = True
 SOUND_MASTER_VOLUME: float = 0.8           # 0..1 master gain for all SFX
+# Per-ability baseline gain applied ON TOP of the master volume, so individual
+# cues that are too loud can be tamed without lowering everything else. These are
+# defined relative to full master (slider at 100 %); the Options-panel slider then
+# scales the whole mix. 1.0 = unchanged, 0.7 = 30 % quieter, 0.4 = 60 % quieter.
+SOUND_ABILITY_GAIN: dict[str, float] = {
+    "fireball": 0.7,
+    "rasengan": 0.7,
+    "chidori": 0.7,
+    "kamehameha": 0.7,
+    "frost_nova": 0.7,
+    "space_stretch": 0.7,
+    "reality_tear": 0.7,
+    "time_freeze": 0.7,
+    "laser_eyes": 0.4,
+}
 SOUND_SFX_DIR: str = "audio/sfx"           # where generated .wav files live
 SOUND_MIXER_FREQUENCY: int = 44100
 SOUND_MIXER_CHANNELS: int = 16             # simultaneous SFX voices
