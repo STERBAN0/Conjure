@@ -56,6 +56,10 @@ screenshots/
 !docs/manual_images/
 !docs/manual_images/*.png
 
+# ...and the per-ability demo GIFs shown in the README
+!docs/demo/
+!docs/demo/*.gif
+
 # Models — bulky and fetched at install
 models/*.task
 models/*.tflite

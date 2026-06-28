@@ -8,8 +8,56 @@
 > rubber band. Close your eyes, open them, and fire twin laser beams.
 > All from a webcam, no controllers, no marker setup.
 
-<!-- demo video goes here -->
-_Demo video coming soon._
+## Demo
+
+Every clip below is real-time from a single webcam session — no compositing, no
+post-production. Longer abilities are slightly sped up so each one stays a tidy
+loop.
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/demo/laser_eyes.gif" width="270" alt="Laser Eyes demo"><br>
+      <b>Laser Eyes</b><br><sub>close eyes &rarr; open to fire &amp; draw</sub>
+    </td>
+    <td align="center">
+      <img src="docs/demo/kamehameha.gif" width="270" alt="Kamehameha demo"><br>
+      <b>Kamehameha</b><br><sub>cup hands &rarr; aim the beam</sub>
+    </td>
+    <td align="center">
+      <img src="docs/demo/chidori.gif" width="270" alt="Chidori demo"><br>
+      <b>Chidori</b><br><sub>V-sign &rarr; lightning blade</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/demo/fireball.gif" width="270" alt="Fireball demo"><br>
+      <b>Fireball</b><br><sub>point &rarr; flick to shoot</sub>
+    </td>
+    <td align="center">
+      <img src="docs/demo/reality_tear.gif" width="270" alt="Reality Tear demo"><br>
+      <b>Reality Tear</b><br><sub>fists &rarr; rip apart</sub>
+    </td>
+    <td align="center">
+      <img src="docs/demo/frost_nova.gif" width="270" alt="Frost Nova demo"><br>
+      <b>Frost Nova</b><br><sub>cross wrists &rarr; spread</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/demo/space_stretch.gif" width="270" alt="Space Stretch demo"><br>
+      <b>Space Stretch</b><br><sub>palms pull apart</sub>
+    </td>
+    <td align="center">
+      <img src="docs/demo/time_freeze.gif" width="270" alt="Time Freeze demo"><br>
+      <b>Time Freeze</b><br><sub>fist &rarr; freeze &amp; shatter</sub>
+    </td>
+    <td align="center">
+      <img src="docs/demo/intro.gif" width="270" alt="Tracking and in-app manual"><br>
+      <b>Tracking + manual</b><br><sub>debug overlay &amp; hand-sign manual</sub>
+    </td>
+  </tr>
+</table>
 
 Conjure watches your hands (and face) through a regular webcam, classifies what
 *pose* you're holding, and plays the matching anime ability with
