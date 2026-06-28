@@ -10,7 +10,8 @@ Hold a hand sign, charge it, then fire.
 |-----|--------|
 | `Q` | Quit |
 | `K` | Show / hide the on-screen controls list |
-| `ESC` | Close the manual / controls list when open (does **not** quit) |
+| `O` | Audio options — mute checkbox + volume slider (mouse-driven) |
+| `ESC` | Close the manual / options / controls list when open (does **not** quit) |
 | `H` | Toggle minimal HUD |
 | `D` | Toggle debug overlay |
 | `L` | Toggle Laser Eyes / face tracking on/off |

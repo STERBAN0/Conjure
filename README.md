@@ -114,6 +114,13 @@ fighting-game move list rather than a noise of overlapping VFX.
 
 Press **M** in-app to open the hand-sign manual with cartoon illustrations of each pose. See [`docs/MANUAL.md`](docs/MANUAL.md) for the full written reference.
 
+## Prerequisites
+
+- **A webcam** — required. The app won't start without one.
+- **Python 3.10 – 3.13, 64-bit** — 3.13 is fine; mediapipe 0.10.35 has wheels for all four versions.
+- **OS** — developed and verified on **Windows**. macOS and Linux should work (all core deps publish wheels for both), but have not been hardware-tested by the maintainer. Please open an issue if you hit platform-specific problems.
+- **Models (~14 MB)** — downloaded automatically on first run via `python run.py`, or manually with `python scripts/download_model.py`. You need an internet connection for that one-time fetch.
+
 ## Quick start
 
 ### System prerequisites
@@ -373,25 +380,33 @@ visual-regression material — eyeball them in `main.py`.
 
 ## Troubleshooting
 
-- **"Cannot open camera 0"** — change `CAM_INDEX` in `config.py`.
-- **"Hand landmarker model not found"** — run `python scripts/download_model.py`.
-- **Laser Eyes never activates** — the face model isn't downloaded. Run
-  `python scripts/download_model.py`; it fetches both models.
-- **No audio reactivity** — first run prints the reason. Usually missing
-  PortAudio. The system falls back to silent operation; effects that
-  read `audio_level` just see `0.0`.
-- **Volume keeps engaging when I don't want it to** — raise
-  `VOLUME_GESTURE_STILLNESS` or set `SYSTEM_CONTROLS_ENABLED = False`.
-- **Effects look blurry on a 4K display** — pygame doesn't auto-scale.
-  Bump `WINDOW_W` / `WINDOW_H` to your display resolution. The 1280×720
-  default is for headroom.
-- **Wrong hand labelled Left/Right** — your camera may already mirror in
-  firmware. Set `INVERT_HANDEDNESS_AFTER_MIRROR = False`.
-- **Pose won't activate / activates then immediately drops** — open the
-  debug overlay (`D`) and watch the confidence readouts. The hysteresis
-  requires `POSE_ENTER_FRAMES` (default 4) consecutive frames above
-  `POSE_ENTER_THRESHOLD` (default 0.55). Tweak those in `config.py` if
-  your camera or lighting is borderline.
+**"Cannot open camera 0" or crash on startup**
+Another app (Zoom, Teams, OBS) is holding the camera, or no webcam is connected. Close the other app, reconnect the webcam, and relaunch. If you have multiple cameras, set `CAM_INDEX` in `config.py` to the right device number (try `1`, `2`, …).
+
+**Black window that never shows the camera / app seems frozen**
+The webcam opened but another app is feeding it empty frames. Close the app that's using the camera (Zoom, Teams, OBS) and relaunch Conjure.
+
+**No sound**
+Conjure runs silently when it can't open an audio device — this is expected, not an error. Everything visual still works. If you want sound: on macOS run `brew install portaudio`; on Linux run `sudo apt-get install libportaudio2`; then relaunch. You can also adjust volume or mute from inside the app: press `O` to open the audio options panel (mute checkbox + volume slider, mouse-driven).
+
+**"model not found" / FileNotFoundError on startup**
+The MediaPipe model files weren't downloaded. Run `python run.py` (it downloads them automatically) or `python scripts/download_model.py` directly. Laser Eyes specifically needs the face model; if only that one is missing, everything else works and the app logs a hint.
+
+**Dependency install fails**
+Check two things: (1) you have an internet connection for the one-time download, and (2) you're running Python 3.10–3.13 64-bit — mediapipe doesn't have wheels outside that range. On Debian/Ubuntu you may need `sudo apt-get install python3-venv` before `python3 run.py` can create the virtual environment.
+
+**Laser Eyes never activates**
+The face model isn't downloaded (`python scripts/download_model.py` fetches both models), or face tracking was toggled off. The top-left `LASER EYES: ON/OFF` indicator shows the current state; press `L` to toggle it back on.
+
+**No audio reactivity** — first run prints the reason. Usually missing PortAudio. The system falls back to silent operation; effects that read `audio_level` just see `0.0`.
+
+**Volume keeps engaging when I don't want it to** — raise `VOLUME_GESTURE_STILLNESS` or set `SYSTEM_CONTROLS_ENABLED = False`.
+
+**Effects look blurry on a 4K display** — pygame doesn't auto-scale. Bump `WINDOW_W` / `WINDOW_H` to your display resolution. The 1280×720 default is for headroom.
+
+**Wrong hand labelled Left/Right** — your camera may already mirror in firmware. Set `INVERT_HANDEDNESS_AFTER_MIRROR = False`.
+
+**Pose won't activate / activates then immediately drops** — open the debug overlay (`D`) and watch the confidence readouts. The hysteresis requires `POSE_ENTER_FRAMES` (default 9, ~0.15 s at 60 FPS) consecutive frames above `POSE_ENTER_THRESHOLD` (default 0.55). Tweak those in `config.py` if your camera or lighting is borderline.
 
 ## Roadmap
 
@@ -428,12 +443,21 @@ from optimizing the arithmetic.
 
 ## License
 
-[MIT](LICENSE). Have fun. If you build something cool with this, please
-ping me — I'd love to see it.
+[MIT](LICENSE), with one exception. The code and the procedurally-generated
+sound effects are MIT. Three bundled anime sound effects
+(`chidori_voice.wav`, `kamehameha_cast.wav`, `time_freeze_charge.wav`) are
+third-party works, © their respective owners, and are **not** covered by the
+MIT grant — see [`NOTICE`](NOTICE). Replace them if you redistribute or use
+this commercially.
+
+Have fun. If you build something cool with this, please ping me — I'd love to
+see it.
 
 ## Credits
 
 - Hand tracking by [MediaPipe](https://developers.google.com/mediapipe).
 - One Euro filter by Géry Casiez, Nicolas Roussel, Daniel Vogel
   ([1euro paper](https://cristal.univ-lille.fr/~casiez/1euro/)).
+- Most sound effects are generated procedurally by `scripts/generate_sfx.py`;
+  three are derived from third-party anime SFX — see [`NOTICE`](NOTICE).
 - Inspired by the shōnen of my youth.

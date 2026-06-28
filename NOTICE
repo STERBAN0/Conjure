@@ -1,0 +1,31 @@
+Conjure — Third-Party Notices
+=============================
+
+The Conjure source code is released under the MIT License (see LICENSE).
+That grant covers the application code and the sound effects that are
+generated procedurally by `scripts/generate_sfx.py`.
+
+Audio carve-out
+---------------
+The following three bundled sound effects are NOT original works and are
+NOT covered by the MIT License. They are derived from third-party anime
+sound effects, and copyright in them remains with their respective owners.
+They are included here only for personal, non-commercial demonstration of
+the matching abilities:
+
+    audio/sfx/chidori_voice.wav
+    audio/sfx/kamehameha_cast.wav
+    audio/sfx/time_freeze_charge.wav
+
+If you fork, redistribute, or use Conjure commercially, please replace
+these three files with audio you have the right to use (procedurally
+generated, CC0/public-domain, or your own original recordings). Removing
+them does not affect functionality: any missing cue simply plays no sound.
+
+The remaining sound effects in `audio/sfx/` are procedurally generated and
+are covered by the MIT License along with the rest of the project.
+
+Other credits
+-------------
+- Hand and face tracking: MediaPipe (Apache License 2.0).
+- One Euro filter: Géry Casiez, Nicolas Roussel, Daniel Vogel.
