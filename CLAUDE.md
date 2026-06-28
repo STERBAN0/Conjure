@@ -37,7 +37,8 @@ Key files:
 | `gestures/router.py` | `default_abilities()` — the roster of registered abilities |
 | `effects/base.py` | `Effect` base class with lifecycle hooks: `on_enter`, `on_charge`, `on_release`, `on_exit` |
 | `effects/renderer.py` | `default_renderer()` — registers all effect instances |
-| `system/manual.py` | `DRAW_REGISTRY` — in-app hand-sign diagrams (M key) |
+| `system/manual.py` | Paginated in-app manual overlay (M key) |
+| `system/manual_draws.py` | `DRAW_REGISTRY` + per-ability hand-sign diagrams (re-exported from `manual.py`) |
 | `audio/sounds.py` | Hook-driven SFX playback |
 | `system/controls.py` | Windows-only volume gesture (optional, gracefully absent on other platforms) |
 
@@ -60,7 +61,7 @@ Follow this sequence — every step is required:
 
 5. **Register** the effect instance in `effects/renderer.py::default_renderer()`.
 
-6. **Manual entry** — add a draw function to `system/manual.py::DRAW_REGISTRY`
+6. **Manual entry** — add a draw function to `system/manual_draws.py::DRAW_REGISTRY`
    and a page to `docs/MANUAL.md`.
 
 7. **Tests** in `tests/` — at minimum: positive pose recognition, negative (wrong

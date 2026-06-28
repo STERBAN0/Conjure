@@ -118,7 +118,7 @@ tests/            pytest unit tests
 5. **Register the effect** in `effects/renderer.py::default_renderer()`.
 
 6. **Add a manual entry.** Register a draw function in
-   `system/manual.py::DRAW_REGISTRY` keyed by your ability name, then add
+   `system/manual_draws.py::DRAW_REGISTRY` keyed by your ability name, then add
    a corresponding page to `docs/MANUAL.md` with the hand-sign description
    and any clarifying notes. The in-app manual (M key) pulls from
    `DRAW_REGISTRY`; the Markdown file is the written reference.
