@@ -1,13 +1,21 @@
 # Conjure runtime dependencies. The canonical list lives in pyproject.toml;
 # this file is kept for users who prefer `pip install -r requirements.txt`.
 # Run `pip install -e ".[dev]"` to also pick up pytest, ruff, and black.
+#
+# Supported Python: 3.10 - 3.13 (64-bit). mediapipe publishes wheels for these.
+# Upper bounds keep a future major release of any of these libraries from
+# silently breaking a fresh install — bump them once a new major is verified.
+#
+# Known-good, tested combination (Windows, Python 3.13):
+#   opencv-python 4.13  mediapipe 0.10.35  pygame 2.6.1  numpy 2.4.4  sounddevice 0.5.5
 
-opencv-python>=4.8
-mediapipe>=0.10.9
-pygame>=2.5
-numpy>=1.24
-sounddevice>=0.4.6
+opencv-python>=4.8,<5
+mediapipe>=0.10.9,<0.11
+pygame>=2.5,<3
+numpy>=1.24,<3
+sounddevice>=0.4.6,<1
 
-# Windows-only volume gesture. Safe to skip on other platforms.
+# Windows-only volume gesture. Safe to skip on other platforms (the app detects
+# their absence and disables the gesture gracefully).
 pycaw>=20240210; platform_system == "Windows"
 comtypes>=1.2; platform_system == "Windows"
