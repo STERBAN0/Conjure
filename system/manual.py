@@ -656,6 +656,10 @@ class Manual:
 
     def toggle(self) -> None:
         self._open = not self._open
+        # Always (re)open on the first ability (Fireball, 1/9) rather than
+        # wherever the user last paged to before closing.
+        if self._open:
+            self._page = 0
         log.debug("Manual %s", "opened" if self._open else "closed")
 
     def next_page(self) -> None:

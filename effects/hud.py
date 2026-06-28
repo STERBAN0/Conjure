@@ -128,6 +128,7 @@ _ROSTER_ENTRIES: list[tuple[str, str]] = [
 # debug legend uses the short label, the overlay uses the full description.
 _CONTROLS: tuple[tuple[str, str, str], ...] = (
     ("K", "controls", "show / hide this controls list"),
+    ("O", "options", "audio options — mute / volume slider"),
     ("H", "hud", "toggle the minimal HUD"),
     ("D", "debug", "toggle the debug overlay"),
     ("M", "manual", "open the hand-sign manual  (←/→ to page)"),

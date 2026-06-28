@@ -360,3 +360,48 @@ class TestTimeShatter:
         # This must not raise
         hooks.emit("ability_enter", "time_freeze", object(), object())
         hooks.emit("ability_exit", "time_freeze")
+
+
+# ---------------------------------------------------------------------------
+# Tests: master-volume + mute API (driven by the in-app Options panel)
+# ---------------------------------------------------------------------------
+
+class TestVolumeAndMute:
+    def test_initial_master_volume_matches_config(self, sound_manager):
+        import config
+        sm, _hooks, _channel = sound_manager
+        assert sm.master_volume == pytest.approx(config.SOUND_MASTER_VOLUME)
+        assert sm.is_muted is False
+
+    def test_set_master_volume_clamps_and_applies_live(self, sound_manager):
+        sm, _hooks, _channel = sound_manager
+        any_sound = sm._get("rasengan", "charge")
+
+        sm.set_master_volume(0.3)
+        assert sm.master_volume == pytest.approx(0.3)
+        # The new level is pushed onto the loaded Sounds immediately.
+        any_sound.set_volume.assert_called_with(0.3)
+
+        sm.set_master_volume(5.0)    # above range → clamped to 1.0
+        assert sm.master_volume == 1.0
+        sm.set_master_volume(-2.0)   # below range → clamped to 0.0
+        assert sm.master_volume == 0.0
+
+    def test_mute_applies_zero_but_preserves_level(self, sound_manager):
+        sm, _hooks, _channel = sound_manager
+        any_sound = sm._get("rasengan", "charge")
+        sm.set_master_volume(0.6)
+
+        sm.set_muted(True)
+        assert sm.is_muted is True
+        assert sm.master_volume == pytest.approx(0.6)   # level remembered
+        any_sound.set_volume.assert_called_with(0.0)    # but silenced live
+
+        sm.set_muted(False)
+        assert sm.is_muted is False
+        any_sound.set_volume.assert_called_with(0.6)    # restored exactly
+
+    def test_toggle_muted_returns_new_state(self, sound_manager):
+        sm, _hooks, _channel = sound_manager
+        assert sm.toggle_muted() is True
+        assert sm.toggle_muted() is False

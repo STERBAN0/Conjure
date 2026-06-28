@@ -294,7 +294,10 @@ THUMB_OPEN_RATIO_EXTENDED: float = 1.22  # ≥ this => fully extended (1.0)
 # These sit alongside the existing POSE_MATCH_THRESHOLD / POSE_LOST_GRACE_FRAMES.
 POSE_ENTER_THRESHOLD: float = 0.55    # confidence to BEGIN a pose
 POSE_EXIT_THRESHOLD: float = 0.35     # confidence to KEEP a held pose
-POSE_ENTER_FRAMES: int = 4            # consecutive frames above enter-threshold to activate
+# Consecutive frames above enter-threshold before a pose activates and starts
+# charging. At TARGET_FPS=60 this is the deliberate-hold window: 15 ≈ 0.25 s, so
+# a relaxed or transient hand shape no longer trips an ability instantly.
+POSE_ENTER_FRAMES: int = 15           # ~0.25 s @ 60 FPS
 
 # Hand-count debounce. MediaPipe occasionally emits a phantom second hand (or
 # drops one) for a frame or two; on real footage the hand count flickered on
@@ -459,7 +462,7 @@ REALITY_TEAR_PULL_APART_DIST: float = 0.50    # charged + separated past this =>
 #   3. to turn it OFF, close both eyes again for OFF_BLINK_SECONDS.
 # BLINK_GRACE keeps quick natural blinks from ever starting the charge. The off
 # threshold is short (0.25s) so a deliberate squint stops it but blinks don't.
-LASER_EYES_BLINK_GRACE_SECONDS: float = 0.15  # ignore eye-closes shorter than this
+LASER_EYES_BLINK_GRACE_SECONDS: float = 0.3   # ignore eye-closes shorter than this (defeats natural blinks)
 LASER_EYES_OFF_BLINK_SECONDS: float = 0.25    # while firing, a close this long turns it OFF
 
 # -----------------------------------------------------------------------------

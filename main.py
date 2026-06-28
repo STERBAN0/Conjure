@@ -18,6 +18,7 @@ Pipeline (per frame, ~60 Hz):
 Controls:
     Q         - quit
     K         - show / hide the on-screen controls list
+    O         - audio options (mute toggle + volume slider, mouse-driven)
     ESC       - close the manual / controls list (when open)
     H         - toggle minimal HUD
     D         - toggle debug overlay
@@ -43,6 +44,7 @@ from audio.sounds import SoundManager
 from core.hooks import HookBus
 from core.state import PHASE_ACTIVE, FaceData, FrameState
 from effects.hud import HUD
+from effects.options_panel import OptionsPanel
 from effects.renderer import default_renderer
 from gestures.engine import GestureEngine
 from gestures.poses import PoseRecognizer
@@ -119,6 +121,7 @@ def main() -> int:
     renderer = default_renderer(config.WINDOW_W, config.WINDOW_H, hooks)
     hud = HUD(config.WINDOW_W, config.WINDOW_H)
     manual = Manual(config.WINDOW_W, config.WINDOW_H)
+    options = OptionsPanel(config.WINDOW_W, config.WINDOW_H, _sound_manager)
 
     show_hud_minimal = True
     show_hud_debug = False
@@ -131,25 +134,34 @@ def main() -> int:
 
     log.info(
         "Conjure started — press K for the on-screen controls list "
-        "(Q quit, H HUD, D debug, M manual, L laser eyes, R clear drawing, S screenshot)"
+        "(Q quit, O audio options, H HUD, D debug, M manual, L laser eyes, "
+        "R clear drawing, S screenshot)"
     )
     try:
         while True:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return 0
+                # Route mouse events to the options panel while it's open; it
+                # returns True once it consumes one (checkbox toggle / slider drag).
+                if options.is_open and options.handle_event(event):
+                    continue
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         # ESC closes whatever overlay is open (manual first, then
-                        # the controls list); it never quits.
+                        # options, then the controls list); it never quits.
                         if manual.is_open:
                             manual.toggle()
+                        elif options.is_open:
+                            options.toggle()
                         elif show_controls:
                             show_controls = False
                     elif event.key == pygame.K_q:
                         return 0
                     elif event.key == pygame.K_k:
                         show_controls = not show_controls
+                    elif event.key == pygame.K_o:
+                        options.toggle()
                     elif event.key == pygame.K_h:
                         show_hud_minimal = not show_hud_minimal
                     elif event.key == pygame.K_d:
@@ -238,6 +250,8 @@ def main() -> int:
                 manual.render(screen)
             if show_controls:
                 hud.render_controls(screen)
+            if options.is_open:
+                options.render(screen)
 
             pygame.display.flip()
             clock.tick(config.TARGET_FPS)

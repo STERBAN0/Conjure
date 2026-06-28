@@ -88,6 +88,15 @@ def _resolve_sfx_dir(sfx_dir: str) -> Path:
     return Path(__file__).resolve().parents[1] / path
 
 
+def _clamp01(value: float) -> float:
+    """Clamp a volume level to the inclusive 0.0–1.0 range."""
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return value
+
+
 class SoundManager:
     """Plays ability sound cues driven by HookBus events.
 
@@ -105,6 +114,15 @@ class SoundManager:
         # Dedicated channel for the chidori voice clip (the 8s "Chidori!" sound).
         self._chidori_voice_channel: pygame.mixer.Channel | None = None
         self._oneshots: dict[str, pygame.mixer.Sound | None] = {}
+
+        # Live-adjustable master volume + mute, driven by the in-app Options
+        # panel (O key). Kept separate from the per-Sound volumes so unmuting
+        # restores the exact previous level. Safe to read/set even when the
+        # mixer is disabled — the setters become no-ops with no loaded sounds.
+        self._master_volume: float = _clamp01(
+            float(getattr(config, "SOUND_MASTER_VOLUME", 0.8))
+        )
+        self._muted: bool = False
 
         # Track per-activation ready-cue state keyed by ability name.
         # Reset on ability_enter and ability_exit.
@@ -138,13 +156,56 @@ class SoundManager:
         hooks.on("ability_exit", self._on_exit)
 
     # ------------------------------------------------------------------
+    # Public volume / mute API (driven by the Options panel)
+    # ------------------------------------------------------------------
+
+    @property
+    def master_volume(self) -> float:
+        """Current master SFX volume, 0.0–1.0 (independent of mute state)."""
+        return self._master_volume
+
+    @property
+    def is_muted(self) -> bool:
+        return self._muted
+
+    def set_master_volume(self, volume: float) -> None:
+        """Set the master SFX volume (clamped 0–1) and apply it live."""
+        self._master_volume = _clamp01(float(volume))
+        self._apply_volume()
+
+    def set_muted(self, muted: bool) -> None:
+        """Mute or unmute all SFX without losing the chosen volume level."""
+        self._muted = bool(muted)
+        self._apply_volume()
+
+    def toggle_muted(self) -> bool:
+        """Flip the mute state; return the new state."""
+        self.set_muted(not self._muted)
+        return self._muted
+
+    def _effective_volume(self) -> float:
+        """The volume actually applied to Sounds: 0 while muted, else master."""
+        return 0.0 if self._muted else self._master_volume
+
+    def _apply_volume(self) -> None:
+        """Push the effective volume onto every loaded Sound. Safe if empty."""
+        vol = self._effective_volume()
+        for snd in (*self._sounds.values(), *self._oneshots.values()):
+            if snd is None:
+                continue
+            try:
+                snd.set_volume(vol)
+            except Exception as exc:  # noqa: BLE001
+                log.debug("SoundManager: set_volume failed: %s", exc)
+
+    # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
     def _load_sounds(self) -> None:
         """Load all WAV files from the SFX directory into pygame Sound objects."""
         sfx_dir = _resolve_sfx_dir(config.SOUND_SFX_DIR)
-        volume = float(getattr(config, "SOUND_MASTER_VOLUME", 0.8))
+        volume = self._effective_volume()
 
         for ability in _ABILITY_NAMES:
             for cue in ("charge", "ready", "cast"):

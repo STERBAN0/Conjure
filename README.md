@@ -11,18 +11,22 @@
 ## Demo
 
 Every clip below is real-time from a single webcam session — no compositing, no
-post-production. Longer abilities are slightly sped up so each one stays a tidy
-loop.
+post-production, shown at natural speed.
+
+<p align="center">
+  <img src="docs/demo/intro.gif" width="560" alt="Live hand and face tracking with the in-app manual"><br>
+  <sub><b>Live hand &amp; face tracking, the debug overlay, and the in-app manual</b></sub>
+</p>
 
 <table>
   <tr>
     <td align="center">
-      <img src="docs/demo/laser_eyes.gif" width="270" alt="Laser Eyes demo"><br>
-      <b>Laser Eyes</b><br><sub>close eyes &rarr; open to fire &amp; draw</sub>
+      <img src="docs/demo/fireball.gif" width="270" alt="Fireball demo"><br>
+      <b>Fireball</b><br><sub>point &rarr; flick to shoot</sub>
     </td>
     <td align="center">
-      <img src="docs/demo/kamehameha.gif" width="270" alt="Kamehameha demo"><br>
-      <b>Kamehameha</b><br><sub>cup hands &rarr; aim the beam</sub>
+      <img src="docs/demo/rasengan.gif" width="270" alt="Rasengan demo"><br>
+      <b>Rasengan</b><br><sub>stack hands, stir &rarr; throw</sub>
     </td>
     <td align="center">
       <img src="docs/demo/chidori.gif" width="270" alt="Chidori demo"><br>
@@ -31,16 +35,16 @@ loop.
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/demo/fireball.gif" width="270" alt="Fireball demo"><br>
-      <b>Fireball</b><br><sub>point &rarr; flick to shoot</sub>
-    </td>
-    <td align="center">
-      <img src="docs/demo/reality_tear.gif" width="270" alt="Reality Tear demo"><br>
-      <b>Reality Tear</b><br><sub>fists &rarr; rip apart</sub>
+      <img src="docs/demo/kamehameha.gif" width="270" alt="Kamehameha demo"><br>
+      <b>Kamehameha</b><br><sub>cup hands &rarr; aim the beam</sub>
     </td>
     <td align="center">
       <img src="docs/demo/frost_nova.gif" width="270" alt="Frost Nova demo"><br>
       <b>Frost Nova</b><br><sub>cross wrists &rarr; spread</sub>
+    </td>
+    <td align="center">
+      <img src="docs/demo/laser_eyes.gif" width="270" alt="Laser Eyes demo"><br>
+      <b>Laser Eyes</b><br><sub>close eyes &rarr; open to fire &amp; draw</sub>
     </td>
   </tr>
   <tr>
@@ -49,12 +53,12 @@ loop.
       <b>Space Stretch</b><br><sub>palms pull apart</sub>
     </td>
     <td align="center">
-      <img src="docs/demo/time_freeze.gif" width="270" alt="Time Freeze demo"><br>
-      <b>Time Freeze</b><br><sub>fist &rarr; freeze &amp; shatter</sub>
+      <img src="docs/demo/reality_tear.gif" width="270" alt="Reality Tear demo"><br>
+      <b>Reality Tear</b><br><sub>fists &rarr; rip apart</sub>
     </td>
     <td align="center">
-      <img src="docs/demo/intro.gif" width="270" alt="Tracking and in-app manual"><br>
-      <b>Tracking + manual</b><br><sub>debug overlay &amp; hand-sign manual</sub>
+      <img src="docs/demo/time_freeze.gif" width="270" alt="Time Freeze demo"><br>
+      <b>Time Freeze</b><br><sub>fist &rarr; freeze &amp; shatter</sub>
     </td>
   </tr>
 </table>
@@ -204,6 +208,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full contributor setup.
 |---|---|
 | `Q` | Quit |
 | `K` | Show / hide the on-screen controls list |
+| `O` | Open audio options — mute checkbox + volume slider (mouse-driven) |
 | `ESC` | Close the manual / controls list (when open) — does **not** quit |
 | `H` | Toggle the minimal HUD (ability label, charge, cooldown) |
 | `D` | Toggle the debug overlay (signals + poses + face mask) |
