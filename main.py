@@ -61,6 +61,25 @@ log = logging.getLogger("conjure")
 # or after a system stall; keeps dt physics-safe at all times.
 _MIN_DT_SECONDS = 1e-3
 
+# After this many seconds with no camera frames, warn the user — the webcam is
+# almost certainly held by another app (Zoom/Teams/OBS), which OpenCV surfaces
+# as a stream of empty reads rather than an error.
+_NULL_FRAME_WARN_SECONDS = 5.0
+
+
+def _friendly_exit(message: str, detail: Exception | None = None) -> int:
+    """Print a clean, actionable startup error (no traceback) and tear down.
+
+    Used for pre-flight failures — a missing webcam or an un-downloaded model —
+    so a first-time user gets a plain-English message and a clean exit instead
+    of a raw Python stack trace.
+    """
+    pygame.quit()
+    print(f"\nConjure can't start.\n\n{message}\n", file=sys.stderr)
+    if detail is not None:
+        print(f"(technical detail: {detail})", file=sys.stderr)
+    return 1
+
 
 def main() -> int:
     logging.basicConfig(
@@ -72,17 +91,6 @@ def main() -> int:
     n_pass, n_fail = pygame.init()
     if n_fail > 0:
         log.warning("pygame.init(): %d subsystem(s) failed to initialise", n_fail)
-    pygame.display.set_caption("Conjure")
-    # RESIZABLE enables the title-bar MAXIMIZE button and edge-dragging (Windows
-    # greys those out on a fixed-size window). SCALED keeps the render target at
-    # the logical WINDOW_W x WINDOW_H and lets pygame stretch it to whatever the
-    # window becomes — the surface is preserved and letterboxed to keep aspect
-    # ratio, so resizing/maximizing needs no coordinate changes anywhere else.
-    screen = pygame.display.set_mode(
-        (config.WINDOW_W, config.WINDOW_H),
-        pygame.DOUBLEBUF | pygame.SCALED | pygame.RESIZABLE,
-    )
-    clock = pygame.time.Clock()
 
     # Initialise the mixer before constructing SoundManager.
     # Failure is non-fatal: SoundManager degrades gracefully if the mixer is
@@ -110,8 +118,44 @@ def main() -> int:
 
     hooks = HookBus()
     _sound_manager = SoundManager(hooks)  # subscribes to hooks; no shutdown needed
-    camera = Camera()
-    tracker = HandTracker()
+
+    # --- Pre-flight the webcam + hand model BEFORE opening a window ----------
+    # If the camera is missing/busy or the model isn't downloaded, fail here
+    # with a clear, actionable message — not a raw traceback and a window that
+    # flashes open then vanishes. Nothing is shown until we know we can run.
+    try:
+        camera = Camera()
+    except RuntimeError as exc:
+        return _friendly_exit(
+            "No webcam detected. Conjure needs a webcam to see your hands.\n"
+            "  - Connect a webcam, and close any app that might be using it\n"
+            "    (Zoom, Teams, OBS, another browser tab).\n"
+            "  - If you have more than one camera, set CAM_INDEX in config.py.",
+            exc,
+        )
+    try:
+        tracker = HandTracker()
+    except FileNotFoundError as exc:
+        camera.close()
+        return _friendly_exit(
+            "The hand-tracking model hasn't been downloaded yet.\n"
+            "  Run  python run.py            (sets up everything), or\n"
+            "       python scripts/download_model.py",
+            exc,
+        )
+
+    pygame.display.set_caption("Conjure")
+    # RESIZABLE enables the title-bar MAXIMIZE button and edge-dragging (Windows
+    # greys those out on a fixed-size window). SCALED keeps the render target at
+    # the logical WINDOW_W x WINDOW_H and lets pygame stretch it to whatever the
+    # window becomes — the surface is preserved and letterboxed to keep aspect
+    # ratio, so resizing/maximizing needs no coordinate changes anywhere else.
+    screen = pygame.display.set_mode(
+        (config.WINDOW_W, config.WINDOW_H),
+        pygame.DOUBLEBUF | pygame.SCALED | pygame.RESIZABLE,
+    )
+    clock = pygame.time.Clock()
+
     face_tracker = _init_face_tracker()
     engine = GestureEngine()
     poses = PoseRecognizer()
@@ -127,6 +171,7 @@ def main() -> int:
     show_hud_debug = False
     show_controls = False
     last_t = time.monotonic()
+    null_frame_since: float | None = None
     frame_count = 0
     last_face: FaceData | None = None
     prev_time_freeze = False
@@ -189,8 +234,22 @@ def main() -> int:
 
             frame_bgr = camera.read()
             if frame_bgr is None:
+                # A webcam held by another app reads as a stream of empty frames
+                # rather than an error — surface that to the user instead of
+                # hanging on a silent black window forever.
+                stalled = time.monotonic()
+                if null_frame_since is None:
+                    null_frame_since = stalled
+                elif stalled - null_frame_since >= _NULL_FRAME_WARN_SECONDS:
+                    log.warning(
+                        "No camera frames for %.0fs — the webcam may be in use "
+                        "by another app (Zoom/Teams/OBS). Close it and relaunch.",
+                        stalled - null_frame_since,
+                    )
+                    null_frame_since = stalled  # re-arm so it repeats, not spams
                 clock.tick(config.TARGET_FPS)
                 continue
+            null_frame_since = None
 
             now = time.monotonic()
             raw_dt = max(_MIN_DT_SECONDS, now - last_t)
