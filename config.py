@@ -69,8 +69,6 @@ HAND_STALE_RESET_SECONDS: float = 0.35
 # Gesture engine (continuous signals)
 # -----------------------------------------------------------------------------
 SPAN_EXPANSION_GAIN: float = 6.0
-SPAN_HISTORY_SECONDS: float = 0.5
-GRIP_OPEN_THRESHOLD: float = 0.35
 MOTION_ENERGY_DECAY: float = 0.85
 
 # -----------------------------------------------------------------------------
@@ -78,17 +76,12 @@ MOTION_ENERGY_DECAY: float = 0.85
 # -----------------------------------------------------------------------------
 # Each predicate uses these tolerances. They are intentionally loose so the
 # system feels forgiving to natural pose variation; tighten for stricter mode.
-POSE_FINGER_EXTENDED: float = 0.55
-POSE_FINGER_FOLDED: float = 0.45
 POSE_OPEN_PALM_OPENNESS: float = 0.65
-POSE_FIST_OPENNESS: float = 0.30
 # Kamehameha is the "triangle/diamond" chamber pose: two open hands raised
 # together, palms to the camera, with the index fingertips (and thumbs) meeting
 # at the apex. The fingertips touching is the decisive signature that tells it
 # apart from space_stretch (open palms pulled APART) — see _is_kamehameha_cup.
 POSE_KAMEHAMEHA_FINGERTIP_DIST: float = 0.16
-POSE_CLAWED_OPENNESS_LO: float = 0.20
-POSE_CLAWED_OPENNESS_HI: float = 0.60
 
 # -----------------------------------------------------------------------------
 # Ability router (state machine)
@@ -345,22 +338,10 @@ FIST_OPENNESS_MAX: float = 0.28        # tightened so a half-curled idle hand is
 # Fireball additionally requires the fist to FACE the camera (orientation
 # "palm" or "back", not "edge") so an edge-on resting hand fires nothing.
 
-# Rasengan (index up): index clearly extended, others folded, and the index must
-# beat the middle finger by a contrast margin so a sloppy V can't leak in.
-RASENGAN_INDEX_MIN: float = 0.52
-RASENGAN_OTHERS_MAX: float = 0.42
-RASENGAN_INDEX_CONTRAST: float = 0.20  # index_open - middle_open must exceed this
-
 # Chidori (V): index + middle clearly extended, ring + pinky clearly folded.
 CHIDORI_EXT_MIN: float = 0.50
 CHIDORI_FOLD_MAX: float = 0.40
 CHIDORI_PARALLEL_MIN: float = 0.55     # cos-sim of index/middle directions
-
-# Open palm / Time freeze: every finger extended. Time freeze additionally needs
-# a wide spread and stillness so a casual resting open hand stops hogging the
-# single ability slot (it was firing 97x across a 2-minute clip).
-OPEN_FINGER_MIN: float = 0.55
-TIME_FREEZE_SPREAD_MIN: float = 0.45
 
 # (The Rasengan pointing-up and Fireball fist openness gates were removed; the
 # live predicates use the finger-fold metrics defined above instead.)

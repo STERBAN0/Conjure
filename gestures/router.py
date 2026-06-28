@@ -61,7 +61,7 @@ class AbilityDef:
     charge_time: float
     cooldown: float
     active_duration: float
-    release_motion: str | None     # "thrust"|"spread"|"throw"|"shove"|"pose_release"|None
+    release_motion: str | None     # "thrust"|"spread"|"throw"|"shove"|"pose_release"|"pull_apart"|None
     projectile_kind: str | None = None  # "rasengan"|"fireball"|None
 
     @classmethod
@@ -169,7 +169,7 @@ class AbilityRouter(_LaserMixin, _ProjectileMixin):
             self.state.age += frame.dt
             self.state.phase_age += frame.dt
             return self.state
-        match_by_pose.pop("laser_eyes", None)
+        match_by_pose.pop("laser_eyes", None)  # HUD-only match; the face path drives it, never hand-charged
 
         s = self.state
         s.age += frame.dt
